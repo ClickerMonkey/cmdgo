@@ -116,6 +116,14 @@ func ToString(value any) string {
 	return fmt.Sprintf("%+v", value)
 }
 
+func IsTextuallyEqual(value any, text string, textType reflect.Type) bool {
+	parsed, err := ParseType(textType, text)
+	if err != nil {
+		return false
+	}
+	return ToString(value) == ToString(parsed)
+}
+
 func GetArg(name string, defaultValue string, args []string, argPrefix string, flag bool) string {
 	normal := Normalize(name)
 	erase := 0

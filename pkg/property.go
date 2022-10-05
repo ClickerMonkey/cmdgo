@@ -24,6 +24,8 @@ type CommandProperty struct {
 	ShowDefault bool
 	// The default value in string form. ex: `default`
 	Default string
+	// A comma delimited map of acceptable values or a map of key/value pairs. ex: `options:"a,b,c"` or `options:"a:1,b:2,c:3"`
+	Options map[string]string
 	// Used by strings for min length, numbers for min value (inclusive), or by slices for min length. ex `min:"1"`
 	Min *float64
 	// Used by strings for max length, numbers for max value (inclusive), or by slices for max length. ex `max:"10.3"`
@@ -32,6 +34,27 @@ type CommandProperty struct {
 	Env []string
 	// Arg name for this property. ex: `arg:"my-flag"`
 	Arg string
+}
+
+func (prop CommandProperty) Convert(text string) string {
+	if prop.Options != nil && len(prop.Options) > 0 {
+		key := Normalize(text)
+		if converted, ok := prop.Options[key]; ok {
+			return converted
+		}
+		if len(key) > 0 {
+			possible := []string{}
+			for optionKey, optionValue := range prop.Options {
+				if strings.HasPrefix(strings.ToLower(optionKey), key) {
+					possible = append(possible, optionValue)
+				}
+			}
+			if len(possible) == 1 {
+				return possible[0]
+			}
+		}
+	}
+	return text
 }
 
 func (prop *CommandProperty) Load() error {
@@ -49,7 +72,8 @@ func (prop *CommandProperty) Load() error {
 		text = prop.Default
 	}
 	if text != "" {
-		return SetString(prop.Value, text)
+		converted := prop.Convert(text)
+		return SetString(prop.Value, converted)
 	}
 	return nil
 }
@@ -61,7 +85,8 @@ func (prop *CommandProperty) FromArgs(ctx CommandContext, args []string) error {
 
 	value := GetArg(prop.Arg, "", args, ctx.ArgPrefix, prop.IsBool())
 	if value != "" {
-		err := SetString(prop.Value, value)
+		converted := prop.Convert(value)
+		err := SetString(prop.Value, converted)
 		if err != nil {
 			return err
 		}
@@ -105,7 +130,8 @@ func (prop *CommandProperty) Prompt(ctx CommandContext) error {
 	}
 
 	if userInput != "" {
-		err := SetString(prop.Value, userInput)
+		converted := prop.Convert(userInput)
+		err := SetString(prop.Value, converted)
 		if err != nil {
 			return err
 		}
@@ -122,6 +148,20 @@ func (prop CommandProperty) Validate() error {
 		}
 		if prop.Max != nil && size > *prop.Max {
 			return fmt.Errorf("%s has a max of %v", prop.Field.Name, *prop.Max)
+		}
+	}
+	if prop.Options != nil && len(prop.Options) > 0 {
+		concrete := ConcreteValue(prop.Value)
+		rawValue := concrete.Interface()
+		found := false
+		for _, optionValue := range prop.Options {
+			if IsTextuallyEqual(rawValue, optionValue, prop.Field.Type) {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return fmt.Errorf("%s has an invalid option value: %v", prop.Field.Name, rawValue)
 		}
 	}
 	return nil
@@ -230,6 +270,21 @@ func getCommandProperty(field reflect.StructField, value reflect.Value) CommandP
 			prop.Max = &maxInt
 		} else {
 			panic(fmt.Sprintf("max of %s is not a valid float64", field.Name))
+		}
+	}
+
+	if options, ok := field.Tag.Lookup("options"); ok {
+		prop.Options = make(map[string]string)
+
+		optionList := strings.Split(options, ",")
+		for _, option := range optionList {
+			keyValue := strings.Split(option, ":")
+			key := keyValue[0]
+			value := key
+			if len(keyValue) > 1 {
+				value = keyValue[1]
+			}
+			prop.Options[Normalize(key)] = value
 		}
 	}
 
