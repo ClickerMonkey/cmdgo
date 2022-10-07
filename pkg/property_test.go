@@ -47,7 +47,7 @@ func TestConvert(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		prop := CommandProperty{
+		prop := Property{
 			Options: test.options,
 		}
 

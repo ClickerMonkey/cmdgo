@@ -130,7 +130,7 @@ func TestIsDefaultValue(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		actual := IsDefaultValue(test.value)
+		actual := isDefaultValue(test.value)
 		if actual != test.isDefault {
 			t.Errorf("Expected %v but got %v", test.isDefault, actual)
 		}

@@ -10,30 +10,31 @@ import (
 	yaml "gopkg.in/yaml.v2"
 )
 
-func Run(ctx CommandContext, args []string) error {
+func Execute(ctx Context, args []string) error {
 	cmd, err := Capture(ctx, args)
 	if err != nil {
 		return err
 	}
 
-	err = cmd.Execute(ctx)
-	if err != nil {
-		return err
+	if executable, ok := cmd.(Executable); ok {
+		return executable.Execute(ctx)
 	}
 
 	return nil
 }
 
-func Capture(ctx CommandContext, args []string) (Command, error) {
+type CaptureImporter func(data []byte, target *any) error
+
+func Capture(ctx Context, args []string) (any, error) {
 	if len(args) == 0 {
 		return nil, fmt.Errorf("No command given.")
 	}
 
-	commandName := args[0]
-	command := Get(commandName)
+	name := args[0]
+	command := Get(name)
 
 	if command == nil {
-		return nil, fmt.Errorf("Command not found: %v", commandName)
+		return nil, fmt.Errorf("Command not found: %v", name)
 	}
 
 	args = args[1:]
@@ -44,47 +45,45 @@ func Capture(ctx CommandContext, args []string) (Command, error) {
 	}
 
 	interactive, _ := strconv.ParseBool(GetArg("interactive", interactiveDefault, args, ctx.ArgPrefix, true))
-	jsonPath := GetArg("json", "", args, ctx.ArgPrefix, false)
-	xmlPath := GetArg("xml", "", args, ctx.ArgPrefix, false)
-	yamlPath := GetArg("yaml", "", args, ctx.ArgPrefix, false)
-
 	commandInstance := GetInstance(command)
 
-	if jsonPath != "" {
-		jsonFile, err := ioutil.ReadFile(jsonPath)
-		if err != nil {
-			return nil, err
-		}
-		err = json.Unmarshal(jsonFile, &command)
-		if err != nil {
-			return nil, err
-		}
-	}
-	if xmlPath != "" {
-		xmlFile, err := ioutil.ReadFile(xmlPath)
-		if err != nil {
-			return nil, err
-		}
-		err = xml.Unmarshal(xmlFile, &command)
-		if err != nil {
-			return nil, err
-		}
-	}
-	if yamlPath != "" {
-		yamlFile, err := ioutil.ReadFile(yamlPath)
-		if err != nil {
-			return nil, err
-		}
-		err = yaml.Unmarshal(yamlFile, &command)
-		if err != nil {
-			return nil, err
+	for arg, importer := range CaptureImports {
+		path := GetArg(arg, "", args, ctx.ArgPrefix, false)
+		if path != "" {
+			imported, err := ioutil.ReadFile(path)
+			if err != nil {
+				return nil, err
+			}
+			err = importer(imported, &command)
+			if err != nil {
+				return nil, err
+			}
 		}
 	}
 
-	err := commandInstance.Capture(ctx, args, interactive)
+	prompter := ctx.Prompt
+	if prompter != nil && !interactive {
+		ctx.Prompt = nil
+	}
+
+	err := commandInstance.Capture(ctx, args)
+	ctx.Prompt = prompter
+
 	if err != nil {
 		return nil, err
 	}
 
 	return command, nil
+}
+
+var CaptureImports = map[string]CaptureImporter{
+	"json": func(data []byte, target *any) error {
+		return json.Unmarshal(data, target)
+	},
+	"yaml": func(data []byte, target *any) error {
+		return yaml.Unmarshal(data, target)
+	},
+	"xml": func(data []byte, target *any) error {
+		return xml.Unmarshal(data, target)
+	},
 }

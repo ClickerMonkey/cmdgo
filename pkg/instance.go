@@ -4,38 +4,54 @@ import (
 	"reflect"
 )
 
-type CommandInstance struct {
+type Instance struct {
 	Value        reflect.Value
-	PropertyMap  map[string]*CommandProperty
-	PropertyList []*CommandProperty
+	PropertyMap  map[string]*Property
+	PropertyList []*Property
 }
 
-func GetInstance(value any) CommandInstance {
-	reflectValue := reflect.ValueOf(value)
-	structValue := ConcreteValue(reflectValue)
+func GetInstance(value any) Instance {
+	reflected := reflectValue(value)
+	concrete := concreteValue(reflected)
 
-	instance := CommandInstance{
-		Value:        reflectValue,
-		PropertyMap:  make(map[string]*CommandProperty),
-		PropertyList: make([]*CommandProperty, 0),
+	instance := Instance{
+		Value:        reflected,
+		PropertyMap:  make(map[string]*Property),
+		PropertyList: make([]*Property, 0),
 	}
 
-	addProperties(structValue, &instance)
+	addProperties(concrete, &instance)
 
 	return instance
 }
 
-func (cmd *CommandInstance) Capture(ctx CommandContext, args []string, prompt bool) error {
-	valueRaw := cmd.Value.Interface()
+func GetSubInstance(value any, prop Property) Instance {
+	instance := GetInstance(value)
 
-	if dynamic, ok := valueRaw.(CommandDynamic); ok {
-		err := dynamic.Update(ctx, nil, cmd)
+	if concreteKind(instance.Value) != reflect.Struct {
+		instance.AddProperty(&Property{
+			Value:       instance.Value,
+			Type:        instance.Value.Type(),
+			Name:        prop.Name,
+			PromptMulti: prop.PromptMulti,
+			Options:     prop.Options,
+		})
+	}
+
+	return instance
+}
+
+func (inst *Instance) Capture(ctx Context, args []string) error {
+	valueRaw := inst.Value.Interface()
+
+	if dynamic, ok := valueRaw.(Dynamic); ok {
+		err := dynamic.Update(ctx, nil, inst)
 		if err != nil {
 			return err
 		}
 	}
 
-	for _, property := range cmd.PropertyList {
+	for _, property := range inst.PropertyList {
 		err := property.Load()
 		if err != nil {
 			return err
@@ -46,8 +62,8 @@ func (cmd *CommandInstance) Capture(ctx CommandContext, args []string, prompt bo
 			return err
 		}
 
-		if prompt {
-			err := property.Prompt(ctx)
+		if ctx.Prompt != nil {
+			err = property.Prompt(ctx)
 			if err != nil {
 				return err
 			}
@@ -58,15 +74,15 @@ func (cmd *CommandInstance) Capture(ctx CommandContext, args []string, prompt bo
 			return err
 		}
 
-		if dynamic, ok := valueRaw.(CommandDynamic); ok {
-			err := dynamic.Update(ctx, property, cmd)
+		if dynamic, ok := valueRaw.(Dynamic); ok {
+			err = dynamic.Update(ctx, property, inst)
 			if err != nil {
 				return err
 			}
 		}
 	}
 
-	if validate, ok := valueRaw.(CommandValidator); ok {
+	if validate, ok := valueRaw.(Validator); ok {
 		err := validate.Validate(ctx)
 		if err != nil {
 			return err
@@ -76,10 +92,46 @@ func (cmd *CommandInstance) Capture(ctx CommandContext, args []string, prompt bo
 	return nil
 }
 
-func addProperties(structValue reflect.Value, instance *CommandInstance) {
+func (inst Instance) IsDefault() bool {
+	for _, prop := range inst.PropertyList {
+		if !prop.IsDefault() {
+			return false
+		}
+	}
+	return true
+}
+
+func (inst Instance) Count(match Match[PropertyFlags]) int {
+	count := 0
+	for _, prop := range inst.PropertyList {
+		if prop.Flags.Is(match) {
+			count++
+		}
+	}
+	return count
+}
+
+func (inst Instance) Flags() Flags[PropertyFlags] {
+	flags := Flags[PropertyFlags]{}
+	for _, prop := range inst.PropertyList {
+		flags.Set(prop.Flags.value)
+	}
+	return flags
+}
+
+func (inst *Instance) AddProperty(prop *Property) {
+	key := Normalize(prop.Name)
+
+	inst.PropertyMap[key] = prop
+	inst.PropertyList = append(inst.PropertyList, prop)
+}
+
+func addProperties(structValue reflect.Value, instance *Instance) {
 	if structValue.Kind() != reflect.Struct {
 		return
 	}
+
+	structType := structValue.Type()
 
 	for i := 0; i < structValue.NumField(); i++ {
 		fieldValue := structValue.Field(i)
@@ -87,16 +139,13 @@ func addProperties(structValue reflect.Value, instance *CommandInstance) {
 			continue
 		}
 
-		field := structValue.Type().Field(i)
+		field := structType.Field(i)
 
 		if field.Anonymous {
 			addProperties(fieldValue, instance)
 		} else {
-			key := Normalize(field.Name)
-			property := getCommandProperty(field, fieldValue)
-
-			instance.PropertyMap[key] = &property
-			instance.PropertyList = append(instance.PropertyList, &property)
+			property := getStructProperty(field, fieldValue)
+			instance.AddProperty(&property)
 		}
 	}
 }

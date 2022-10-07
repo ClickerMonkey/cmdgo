@@ -14,7 +14,61 @@ func Normalize(x string) string {
 	return strings.ToLower(string(normalizer.ReplaceAll([]byte(x), []byte(""))))
 }
 
+func GetArg(name string, defaultValue string, args []string, argPrefix string, flag bool) string {
+	normal := Normalize(name)
+	erase := 0
+	index := 0
+	value := defaultValue
+	lowerPrefix := strings.ToLower(argPrefix)
+	for index < len(args) {
+		arg := args[index]
+		if strings.HasPrefix(strings.ToLower(arg), lowerPrefix) {
+			key := Normalize(arg[len(argPrefix):])
+			if key == normal {
+				erase = 1
+				if index+1 < len(args) {
+					value = args[index+1]
+					if strings.HasPrefix(strings.ToLower(value), lowerPrefix) {
+						value = defaultValue
+					} else {
+						erase = 2
+					}
+				}
+				if flag && value == defaultValue {
+					value = "true"
+				}
+				break
+			} else {
+				index++
+			}
+		} else {
+			index++
+		}
+	}
+
+	if erase > 0 {
+		args = append(args[0:index], args[index+erase:]...)
+	}
+
+	return value
+}
+
 func SetString(value reflect.Value, s string) error {
+	if value.Kind() == reflect.Pointer {
+		concrete := value.Elem()
+		if value.IsNil() {
+			concrete = reflect.New(value.Type().Elem()).Elem()
+		}
+		err := SetString(concrete, s)
+		if err != nil {
+			return err
+		}
+		if value.IsNil() {
+			value.Set(concrete.Addr())
+		}
+		return nil
+	}
+
 	parsed, err := ParseType(value.Type(), s)
 	if err != nil {
 		return err
@@ -32,6 +86,7 @@ func SetString(value reflect.Value, s string) error {
 	} else if cast, ok := parsed.(string); ok {
 		value.SetString(cast)
 	}
+
 	switch value.Kind() {
 	case reflect.Slice, reflect.Array, reflect.Pointer:
 		value.Set(reflect.ValueOf(parsed))
@@ -80,7 +135,22 @@ func ParseType(t reflect.Type, s string) (any, error) {
 			nonNil, err := ParseType(t.Elem(), s)
 			return &nonNil, err
 		}
-	case reflect.Array, reflect.Slice:
+	case reflect.Array:
+		parts := strings.Split(s, ",")
+		array := reflect.New(t).Elem()
+		length := len(parts)
+		if length > t.Len() {
+			length = t.Len()
+		}
+		for i := 0; i < length; i++ {
+			item, err := ParseType(t.Elem(), parts[i])
+			if err != nil {
+				return nil, err
+			}
+			array.Index(i).Set(reflect.ValueOf(item))
+		}
+		return array.Interface(), nil
+	case reflect.Slice:
 		parts := strings.Split(s, ",")
 		slice := reflect.MakeSlice(reflect.SliceOf(t.Elem()), 0, len(parts))
 		for i := 0; i < len(parts); i++ {
@@ -95,69 +165,89 @@ func ParseType(t reflect.Type, s string) (any, error) {
 	return nil, nil
 }
 
-func ConcreteValue(value reflect.Value) reflect.Value {
+func concreteValue(value reflect.Value) reflect.Value {
 	for value.Kind() == reflect.Pointer {
 		value = value.Elem()
 	}
 	return value
 }
 
-func DefaultValue(t reflect.Type) reflect.Value {
+func concreteType(typ reflect.Type) reflect.Type {
+	for typ.Kind() == reflect.Pointer {
+		typ = typ.Elem()
+	}
+	return typ
+}
+
+func concreteKind(value any) reflect.Kind {
+	ref := reflectValue(value)
+	return concreteType(ref.Type()).Kind()
+}
+
+func setConcrete(value reflect.Value, concrete reflect.Value) {
+	// TODO handle pointer of pointers
+	if value.Kind() == reflect.Pointer {
+		value.Set(pointerOf(concrete))
+	} else {
+		value.Set(concrete)
+	}
+}
+
+func defaultValue(t reflect.Type) reflect.Value {
 	return reflect.New(t).Elem()
 }
 
-func IsDefaultValue(value any) bool {
-	defaultValue := DefaultValue(reflect.TypeOf(value)).Interface()
-
-	return ToString(defaultValue) == ToString(value)
+func cloneDefault(value any) any {
+	return reflect.New(reflect.ValueOf(value).Type()).Interface()
 }
 
-func ToString(value any) string {
+func initialize(value reflect.Value) reflect.Value {
+	if value.Kind() == reflect.Pointer && value.IsNil() {
+		value.Set(initializeType(value.Type()))
+	}
+	return value
+}
+
+func pointerOf(value reflect.Value) reflect.Value {
+	ptr := reflect.New(value.Type())
+	ptr.Elem().Set(value)
+	return ptr
+}
+
+func initializeType(typ reflect.Type) reflect.Value {
+	switch typ.Kind() {
+	case reflect.Pointer:
+		return pointerOf(initializeType(typ.Elem()))
+	case reflect.Slice:
+		return reflect.MakeSlice(typ, 0, 0)
+	case reflect.Map:
+		return reflect.MakeMap(typ)
+	default:
+		return reflect.New(typ).Elem()
+	}
+}
+
+func isDefaultValue(value any) bool {
+	defaultValue := defaultValue(reflect.TypeOf(value)).Interface()
+
+	return toString(defaultValue) == toString(value)
+}
+
+func toString(value any) string {
 	return fmt.Sprintf("%+v", value)
 }
 
-func IsTextuallyEqual(value any, text string, textType reflect.Type) bool {
+func isTextuallyEqual(value any, text string, textType reflect.Type) bool {
 	parsed, err := ParseType(textType, text)
 	if err != nil {
 		return false
 	}
-	return ToString(value) == ToString(parsed)
+	return toString(value) == toString(parsed)
 }
 
-func GetArg(name string, defaultValue string, args []string, argPrefix string, flag bool) string {
-	normal := Normalize(name)
-	erase := 0
-	index := 0
-	value := defaultValue
-	for index < len(args) {
-		arg := args[index]
-		if strings.HasPrefix(arg, argPrefix) {
-			key := Normalize(arg[len(argPrefix):])
-			if key == normal {
-				erase = 1
-				if index+1 < len(args) {
-					value = args[index+1]
-					if strings.HasPrefix(value, argPrefix) {
-						value = defaultValue
-					} else {
-						erase = 2
-					}
-				}
-				if flag && value == defaultValue {
-					value = "true"
-				}
-				break
-			} else {
-				index++
-			}
-		} else {
-			index++
-		}
+func reflectValue(value any) reflect.Value {
+	if v, ok := value.(reflect.Value); ok {
+		return v
 	}
-
-	if erase > 0 {
-		args = append(args[0:index], args[index+erase:]...)
-	}
-
-	return value
+	return reflect.ValueOf(value)
 }

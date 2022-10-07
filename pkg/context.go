@@ -3,35 +3,45 @@ package cmdgo
 import (
 	"bufio"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 )
 
 // A dynamic set of variables that commands can have access to during capture and execution.
-type CommandContext struct {
-	Prompt      func(prompt string) (string, error)
+type Context struct {
+	Prompt      func(prompt string, prop Property) (string, error)
 	Values      map[string]any
 	HelpPrompt  string
-	DisplayHelp func(prop CommandProperty)
+	DisplayHelp func(prop Property)
 	ArgPrefix   string
+	StartIndex  int64
 }
 
-func NewStandardContext(values map[string]any) CommandContext {
+func NewContext() Context {
 	reader := bufio.NewReader(os.Stdin)
-	return CommandContext{
-		Values:     values,
+	return Context{
+		Values:     make(map[string]any),
 		HelpPrompt: "help!",
 		ArgPrefix:  "--",
-		Prompt: func(prompt string) (string, error) {
+		StartIndex: 1,
+		Prompt: func(prompt string, prop Property) (string, error) {
 			fmt.Print(prompt)
-			input, err := reader.ReadString('\n')
-			if err != nil {
-				return "", err
+			input := ""
+			for {
+				line, err := reader.ReadString('\n')
+				if err != nil && err != io.EOF {
+					return "", err
+				}
+				input += line
+				if !prop.PromptMulti || line == "" || err != nil {
+					break
+				}
 			}
 			input = strings.TrimRight(input, "\n")
 			return input, nil
 		},
-		DisplayHelp: func(prop CommandProperty) {
+		DisplayHelp: func(prop Property) {
 			fmt.Println(prop.Help)
 		},
 	}

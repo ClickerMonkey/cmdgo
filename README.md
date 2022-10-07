@@ -16,16 +16,16 @@ type Echo struct {
   Message string `prompt:"Enter message" help:"The message to enter" default:"Hello World" min:"2" env:"ECHO_MESSAGE" arg:"msg"`
 }
 
-func (echo *Echo) Execute(ctx cmdgo.CommandContext) error {
+func (echo *Echo) Execute(ctx cmdgo.Context) error {
   fmt.Printf("ECHO: %s\n", echo.Message)
   return nil
 }
 
 func main() {
-  cmdgo.Register("echo", func() cmdgo.Command { return &Echo{} })
+  cmdgo.Register("echo", Echo{})
 
-  ctx := NewStandardContext(map[string]any{})
-  err := cmdgo.Run(ctx, os.Args[1:])
+  ctx := cmdgo.NewContext()
+  err := cmdgo.Execute(ctx, os.Args[1:])
   if err != nil {
     panic(err)
   }
@@ -35,6 +35,7 @@ func main() {
 ### Example Usage
 
 ```
+# By default its interactive unless you specify arguments or files to import
 > ./myprogram echo
 Enter message: Hi
 ECHO: Hi
@@ -62,7 +63,7 @@ ECHO: Hello World
 ECHO: From json!
 
 > ./myprogram echo --xml path/to/xml/file
-# <Root><Message>From xml!</Message</Root>
+# <Root><Message>From xml!</Message></Root>
 ECHO: From xml!
 
 > ./myprogram echo --yaml path/to/yaml/file

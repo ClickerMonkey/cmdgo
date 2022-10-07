@@ -1,24 +1,15 @@
 package cmdgo
 
-type CommandProvider func() Command
+var Registry = make(map[string]any)
 
-var CommandRegistry = make(map[string]CommandProvider)
-
-func Register(name string, provider CommandProvider) {
-	CommandRegistry[Normalize(name)] = provider
+func Register(name string, command any) {
+	Registry[Normalize(name)] = command
 }
 
-func Get(name string) Command {
-	provider := GetProvider(name)
-	if provider == nil {
-		return nil
-	}
-	return (*provider)()
-}
-
-func GetProvider(name string) *CommandProvider {
-	if provider, ok := CommandRegistry[Normalize(name)]; ok {
-		return &provider
+func Get(name string) any {
+	if command, ok := Registry[Normalize(name)]; ok {
+		copy := cloneDefault(command)
+		return copy
 	}
 	return nil
 }
