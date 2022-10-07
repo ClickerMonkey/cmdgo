@@ -82,7 +82,7 @@ func (prop Property) Convert(text string) string {
 // Returns whether this property can have its state loaded from environment variables
 // or default tags.
 func (prop Property) CanLoad() bool {
-	return !prop.IsIgnored()
+	return !prop.IsIgnored() && prop.IsSimple() && prop.IsDefault()
 }
 
 // Loads the initial value of the property from environment variables
@@ -92,16 +92,6 @@ func (prop *Property) Load() error {
 		return nil
 	}
 
-	switch {
-	case prop.IsSimple():
-		return prop.loadSimple()
-		// other loading is done in fromArgsX
-	}
-
-	return nil
-}
-
-func (prop *Property) loadSimple() error {
 	text := ""
 	flag := PropertyFlagNone
 	if prop.Env != nil && len(prop.Env) > 0 {
@@ -649,18 +639,16 @@ func getStructProperty(field reflect.StructField, value reflect.Value) Property 
 	}
 
 	if min, ok := field.Tag.Lookup("min"); ok {
-		minInt, err := strconv.ParseFloat(min, 64)
-		if err == nil {
-			prop.Min = &minInt
+		if minFloat, err := strconv.ParseFloat(min, 64); err == nil {
+			prop.Min = &minFloat
 		} else {
 			panic(fmt.Sprintf("min of %s is not a valid float64", field.Name))
 		}
 	}
 
 	if max, ok := field.Tag.Lookup("max"); ok {
-		maxInt, err := strconv.ParseFloat(max, 64)
-		if err == nil {
-			prop.Max = &maxInt
+		if maxFloat, err := strconv.ParseFloat(max, 64); err == nil {
+			prop.Max = &maxFloat
 		} else {
 			panic(fmt.Sprintf("max of %s is not a valid float64", field.Name))
 		}

@@ -7,7 +7,7 @@ import (
 	"io/ioutil"
 	"strconv"
 
-	yaml "gopkg.in/yaml.v2"
+	"github.com/go-yaml/yaml"
 )
 
 func Execute(ctx Context, args []string) error {
@@ -23,7 +23,7 @@ func Execute(ctx Context, args []string) error {
 	return nil
 }
 
-type CaptureImporter func(data []byte, target *any) error
+type CaptureImporter func(data []byte, target any) error
 
 func Capture(ctx Context, args []string) (any, error) {
 	if len(args) == 0 {
@@ -54,7 +54,7 @@ func Capture(ctx Context, args []string) (any, error) {
 			if err != nil {
 				return nil, err
 			}
-			err = importer(imported, &command)
+			err = importer(imported, command)
 			if err != nil {
 				return nil, err
 			}
@@ -77,13 +77,13 @@ func Capture(ctx Context, args []string) (any, error) {
 }
 
 var CaptureImports = map[string]CaptureImporter{
-	"json": func(data []byte, target *any) error {
+	"json": func(data []byte, target any) error {
 		return json.Unmarshal(data, target)
 	},
-	"yaml": func(data []byte, target *any) error {
+	"yaml": func(data []byte, target any) error {
 		return yaml.Unmarshal(data, target)
 	},
-	"xml": func(data []byte, target *any) error {
+	"xml": func(data []byte, target any) error {
 		return xml.Unmarshal(data, target)
 	},
 }

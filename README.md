@@ -9,6 +9,7 @@ package main
 
 import (
   "fmt"
+  "os"
   cmdgo "github.com/ClickerMonkey/cmdgo/pkg"
 )
 
@@ -37,22 +38,22 @@ func main() {
 ```
 # By default its interactive unless you specify arguments or files to import
 > ./myprogram echo
-Enter message: Hi
+Enter message (Hello World): Hi
 ECHO: Hi
 
 > ./myprogram echo --msg Ho
 ECHO: Ho
 
 > ./myprogram echo
-Enter message: help!
+Enter message (Hello World): help!
 The message to enter
-Enter message: Lets go
+Enter message (Hello World): Lets go
 ECHO: Lets go
 
-> ECHO_MESSAGE=Hey ./myprogram echo --interactive false
+> ECHO_MESSAGE=Hey ./myprogram echo --interactive no
 ECHO: Hey
 
-> ./myprogram echo --interactive false
+> ./myprogram echo --interactive no
 ECHO: Hello World
 
 > ./myprogram echo --msg A
