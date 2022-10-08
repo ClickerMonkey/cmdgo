@@ -14,6 +14,8 @@ type Context struct {
 	Args                []string
 	Prompt              func(prompt string, prop Property) (string, error)
 	PromptStart         func(prop Property) (bool, error)
+	PromptStartOptions  map[string]bool
+	PromptStartSuffix   string
 	PromptContinue      func(prop Property) (bool, error)
 	PromptEnd           func(prop Property) error
 	Values              map[string]any
@@ -40,11 +42,15 @@ func NewContextFiles(args []string, in *os.File, out *os.File) *Context {
 	reader := bufio.NewReader(os.Stdin)
 
 	ctx.PromptStart = func(prop Property) (bool, error) {
-		start, err := ctx.Prompt(fmt.Sprintf("%s (y/n): ", prop.PromptStart), prop)
-		if err != nil {
-			return false, err
+		for {
+			input, err := ctx.Prompt(prop.PromptStart+ctx.PromptStartSuffix, prop)
+			if err != nil {
+				return false, err
+			}
+			if answer, ok := ctx.PromptStartOptions[strings.ToLower(input)]; ok {
+				return answer, nil
+			}
 		}
-		return start == "" || strings.EqualFold(start, "y"), nil
 	}
 
 	ctx.PromptContinue = func(prop Property) (bool, error) {
@@ -92,12 +98,29 @@ func NewContextQuiet(args []string) *Context {
 	argsCopy := make([]string, len(args))
 	copy(argsCopy, args)
 
+	promptOptions := map[string]bool{
+		"y":     true,
+		"yes":   true,
+		"1":     true,
+		"t":     true,
+		"true":  true,
+		"ok":    true,
+		"":      true,
+		"n":     false,
+		"no":    false,
+		"0":     false,
+		"f":     false,
+		"false": false,
+	}
+
 	return &Context{
 		Args:                argsCopy,
 		Values:              make(map[string]any),
 		HelpPrompt:          "help!",
 		StartIndex:          1,
 		ArgPrefix:           "--",
+		PromptStartOptions:  promptOptions,
+		PromptStartSuffix:   " (y/n): ",
 		ArgStructTemplate:   newTemplate("{{ .Prefix }}{{ .Arg }}-"),
 		ArgSliceTemplate:    newTemplate("{{ .Prefix }}{{ .Arg }}{{ if not .IsSimple }}-{{ .Index }}-{{ end }}"),
 		ArgArrayTemplate:    newTemplate("{{ .Prefix }}{{ .Arg }}-{{ .Index }}{{ if not .IsSimple }}-{{ end }}"),
