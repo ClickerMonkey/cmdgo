@@ -11,7 +11,7 @@ import (
 type Profile struct {
 	Name        string `prompt:"Your name" min:"2"`
 	Age         *int   `prompt:"Your age"`
-	FaveNumbers []int  `prompt:"Favorite numbers" prompt-options:"start:-,end:,more:More?" arg:"favenum"`
+	FaveNumbers []int  `prompt:"Favorite numbers" prompt-options:"start:-,end:,more:More?" arg:"favenum" min:"3"`
 	FaveMovies  []struct {
 		Title  string
 		Rating float32 `prompt:"Rating (0-10)" min:"0" max:"10"`

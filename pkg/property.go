@@ -34,7 +34,7 @@ type Property struct {
 	Help string
 	// If the default value should be shown to the user. ex: `default-mode:"hide"`
 	HideDefault bool
-	// Default text to display to override the text version of the current value
+	// Default text to display to override the text version of the current value. ex: `default-text:"***"`
 	DefaultText string
 	// The default value in string form. ex: `default`
 	Default string
@@ -281,12 +281,14 @@ func (prop *Property) fromArgsSlice(ctx Context, args *[]string) error {
 			break
 		}
 
-		more, err := prop.promptMore(ctx)
-		if err != nil {
-			return err
-		}
-		if !more {
-			break
+		if prop.Min == nil || length >= int(*prop.Min) {
+			more, err := prop.promptMore(ctx)
+			if err != nil {
+				return err
+			}
+			if !more {
+				break
+			}
 		}
 	}
 
@@ -417,12 +419,14 @@ func (prop *Property) fromArgsMap(ctx Context, args *[]string) error {
 			break
 		}
 
-		more, err := prop.promptMore(ctx)
-		if err != nil {
-			return err
-		}
-		if !more {
-			break
+		if prop.Min == nil || length >= int(*prop.Min) {
+			more, err := prop.promptMore(ctx)
+			if err != nil {
+				return err
+			}
+			if !more {
+				break
+			}
 		}
 	}
 

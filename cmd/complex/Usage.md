@@ -4,9 +4,7 @@ Interactive (no arguments)
 Your name: ClickerMonkey
 Your age: 33
 Favorite numbers: 1
-More? (y/n): y
 Favorite numbers: 3
-More? (y/n): y
 Favorite numbers: 7
 More? (y/n): y
 Favorite numbers: 9
