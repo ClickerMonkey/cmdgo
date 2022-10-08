@@ -2,12 +2,15 @@ package cmdgo
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"strings"
 	"text/template"
 )
+
+var Quit = errors.New("QUIT")
 
 // A dynamic set of variables that commands can have access to during capture and execution.
 type Context struct {
@@ -22,6 +25,7 @@ type Context struct {
 	PromptEnd           func(prop Property) error
 	Values              map[string]any
 	HelpPrompt          string
+	QuitPrompt          string
 	DisplayHelp         func(prop Property)
 	ArgPrefix           string
 	StartIndex          int
@@ -89,6 +93,9 @@ func NewContextFiles(args []string, in *os.File, out *os.File) *Context {
 			}
 		}
 		input = strings.TrimRight(input, "\n")
+		if strings.EqualFold(input, ctx.QuitPrompt) {
+			return input, Quit
+		}
 		return input, nil
 	}
 
@@ -123,6 +130,7 @@ func NewContextQuiet(args []string) *Context {
 		Args:                argsCopy,
 		Values:              make(map[string]any),
 		HelpPrompt:          "help!",
+		QuitPrompt:          "quit!",
 		StartIndex:          1,
 		ArgPrefix:           "--",
 		PromptStartOptions:  promptOptions,

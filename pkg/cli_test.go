@@ -32,6 +32,14 @@ func TestSimple(t *testing.T) {
 			errorText: "Message is required",
 		},
 		{
+			args:      []string{},
+			result:    "",
+			errorText: "QUIT",
+			prompts: map[string]string{
+				"Message: ": "quit!",
+			},
+		},
+		{
 			args:   []string{"-message", "hi"},
 			result: "hi",
 		},
@@ -58,6 +66,10 @@ func TestSimple(t *testing.T) {
 		ctx := NewContextQuiet(append([]string{"simple"}, test.args...))
 		ctx.ArgPrefix = "-"
 		ctx.Prompt = func(prompt string, prop Property) (string, error) {
+			input := test.prompts[prompt]
+			if input == ctx.QuitPrompt {
+				return input, Quit
+			}
 			return test.prompts[prompt], nil
 		}
 		ctx.DisplayHelp = func(prop Property) {
