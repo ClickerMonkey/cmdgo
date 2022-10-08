@@ -10,8 +10,8 @@ import (
 	"github.com/go-yaml/yaml"
 )
 
-func Execute(ctx *Context, args []string) error {
-	cmd, err := Capture(ctx, args)
+func Execute(ctx *Context) error {
+	cmd, err := Capture(ctx)
 	if err != nil {
 		return err
 	}
@@ -25,30 +25,29 @@ func Execute(ctx *Context, args []string) error {
 
 type CaptureImporter func(data []byte, target any) error
 
-func Capture(ctx *Context, args []string) (any, error) {
-	if len(args) == 0 {
+func Capture(ctx *Context) (any, error) {
+	if len(ctx.Args) == 0 {
 		return nil, fmt.Errorf("No command given.")
 	}
 
-	name := args[0]
+	name := ctx.Args[0]
 	command := Get(name)
 
 	if command == nil {
 		return nil, fmt.Errorf("Command not found: %v", name)
 	}
 
-	args = args[1:]
+	ctx.Args = ctx.Args[1:]
 
 	interactiveDefault := "false"
-	if len(args) == 0 {
+	if len(ctx.Args) == 0 {
 		interactiveDefault = "true"
 	}
 
-	interactive, _ := strconv.ParseBool(GetArg("interactive", interactiveDefault, &args, ctx.ArgPrefix, true))
-	commandInstance := GetInstance(command)
+	interactive, _ := strconv.ParseBool(GetArg("interactive", interactiveDefault, &ctx.Args, ctx.ArgPrefix, true))
 
 	for arg, importer := range CaptureImports {
-		path := GetArg(arg, "", &args, ctx.ArgPrefix, false)
+		path := GetArg(arg, "", &ctx.Args, ctx.ArgPrefix, false)
 		if path != "" {
 			imported, err := ioutil.ReadFile(path)
 			if err != nil {
@@ -64,10 +63,13 @@ func Capture(ctx *Context, args []string) (any, error) {
 	prompter := ctx.Prompt
 	if prompter != nil && !interactive {
 		ctx.Prompt = nil
+		defer func() {
+			ctx.Prompt = prompter
+		}()
 	}
 
-	err := commandInstance.Capture(ctx, &args)
-	ctx.Prompt = prompter
+	commandInstance := GetInstance(command)
+	err := commandInstance.Capture(ctx)
 
 	if err != nil {
 		return nil, err

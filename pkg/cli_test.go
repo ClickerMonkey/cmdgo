@@ -55,7 +55,7 @@ func TestSimple(t *testing.T) {
 	for _, test := range tests {
 		actualHelps := []string{}
 
-		ctx := NewContextQuiet()
+		ctx := NewContextQuiet(append([]string{"simple"}, test.args...))
 		ctx.ArgPrefix = "-"
 		ctx.Prompt = func(prompt string, prop Property) (string, error) {
 			return test.prompts[prompt], nil
@@ -64,7 +64,7 @@ func TestSimple(t *testing.T) {
 			actualHelps = append(actualHelps, prop.Help)
 		}
 
-		err := Execute(ctx, append([]string{"simple"}, test.args...))
+		err := Execute(ctx)
 		if err != nil {
 			if test.errorText == "" {
 				t.Fatal(err)
@@ -212,10 +212,10 @@ func TestVaried(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		ctx := NewContextQuiet()
+		ctx := NewContextQuiet(append([]string{"varied"}, test.args...))
 		ctx.ArgPrefix = "-"
 
-		captured, err := Capture(ctx, append([]string{"varied"}, test.args...))
+		captured, err := Capture(ctx)
 		if err != nil {
 			t.Errorf("Test %s failed with error %v", test.name, err)
 		} else if !equalsJson(captured, test.expected) {

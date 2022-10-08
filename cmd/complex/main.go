@@ -28,8 +28,8 @@ func (prof *Profile) Execute(ctx *cmdgo.Context) error {
 func main() {
 	cmdgo.Register("profile", Profile{})
 
-	ctx := cmdgo.NewContext()
-	err := cmdgo.Execute(ctx, os.Args[1:])
+	ctx := cmdgo.NewContext(os.Args[1:])
+	err := cmdgo.Execute(ctx)
 	if err != nil {
 		panic(err)
 	}

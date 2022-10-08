@@ -25,8 +25,8 @@ func (echo *Echo) Execute(ctx cmdgo.Context) error {
 func main() {
   cmdgo.Register("echo", Echo{})
 
-  ctx := cmdgo.NewContext()
-  err := cmdgo.Execute(ctx, os.Args[1:])
+  ctx := cmdgo.NewContext(os.Args[1:])
+  err := cmdgo.Execute(ctx)
   if err != nil {
     panic(err)
   }

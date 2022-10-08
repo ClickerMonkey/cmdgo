@@ -124,29 +124,29 @@ func (prop Property) CanFromArgs() bool {
 }
 
 // Loads value of the property from args if it can and it exists.
-func (prop *Property) FromArgs(ctx *Context, args *[]string) error {
+func (prop *Property) FromArgs(ctx *Context) error {
 	if !prop.CanFromArgs() {
 		return nil
 	}
 
 	switch {
 	case prop.IsSimple():
-		return prop.fromArgsSimple(ctx, args)
+		return prop.fromArgsSimple(ctx)
 	case prop.IsStruct():
-		return prop.fromArgsStruct(ctx, args)
+		return prop.fromArgsStruct(ctx)
 	case prop.IsSlice():
-		return prop.fromArgsSlice(ctx, args)
+		return prop.fromArgsSlice(ctx)
 	case prop.IsArray():
-		return prop.fromArgsArray(ctx, args)
+		return prop.fromArgsArray(ctx)
 	case prop.IsMap():
-		return prop.fromArgsMap(ctx, args)
+		return prop.fromArgsMap(ctx)
 	}
 
 	return nil
 }
 
-func (prop *Property) fromArgsSimple(ctx *Context, args *[]string) error {
-	value := GetArg(prop.Arg, "", args, ctx.ArgPrefix, prop.IsBool())
+func (prop *Property) fromArgsSimple(ctx *Context) error {
+	value := GetArg(prop.Arg, "", &ctx.Args, ctx.ArgPrefix, prop.IsBool())
 	if value != "" {
 		return prop.Set(value, PropertyFlagArgs)
 	}
@@ -192,7 +192,7 @@ func (prop Property) promptMore(ctx *Context) (bool, error) {
 	return true, nil
 }
 
-func (prop *Property) fromArgsStruct(ctx *Context, args *[]string) error {
+func (prop *Property) fromArgsStruct(ctx *Context) error {
 	start, err := prop.promptStart(ctx)
 	if !start {
 		return err
@@ -215,7 +215,7 @@ func (prop *Property) fromArgsStruct(ctx *Context, args *[]string) error {
 		return err
 	}
 
-	flags, err := captureValue(ctx, args, *prop, value, prefix)
+	flags, err := captureValue(ctx, *prop, value, prefix)
 	if err != nil {
 		return err
 	}
@@ -234,7 +234,7 @@ func (prop *Property) fromArgsStruct(ctx *Context, args *[]string) error {
 	return nil
 }
 
-func (prop *Property) fromArgsSlice(ctx *Context, args *[]string) error {
+func (prop *Property) fromArgsSlice(ctx *Context) error {
 	start, err := prop.promptStart(ctx)
 	if !start {
 		return err
@@ -264,7 +264,7 @@ func (prop *Property) fromArgsSlice(ctx *Context, args *[]string) error {
 			return err
 		}
 
-		element, loaded, err := captureType(ctx, args, *prop, elementType, elementPrefix)
+		element, loaded, err := captureType(ctx, *prop, elementType, elementPrefix)
 		if err != nil {
 			return err
 		}
@@ -304,7 +304,7 @@ func (prop *Property) fromArgsSlice(ctx *Context, args *[]string) error {
 	return nil
 }
 
-func (prop *Property) fromArgsArray(ctx *Context, args *[]string) error {
+func (prop *Property) fromArgsArray(ctx *Context) error {
 	start, err := prop.promptStart(ctx)
 	if !start {
 		return err
@@ -335,7 +335,7 @@ func (prop *Property) fromArgsArray(ctx *Context, args *[]string) error {
 			return err
 		}
 
-		loaded, err := captureValue(ctx, args, *prop, element, elementPrefix)
+		loaded, err := captureValue(ctx, *prop, element, elementPrefix)
 		if err != nil {
 			return err
 		}
@@ -357,7 +357,7 @@ func (prop *Property) fromArgsArray(ctx *Context, args *[]string) error {
 	return nil
 }
 
-func (prop *Property) fromArgsMap(ctx *Context, args *[]string) error {
+func (prop *Property) fromArgsMap(ctx *Context) error {
 	start, err := prop.promptStart(ctx)
 	if !start {
 		return err
@@ -392,7 +392,7 @@ func (prop *Property) fromArgsMap(ctx *Context, args *[]string) error {
 			return err
 		}
 
-		key, keyLoaded, err := captureType(ctx, args, *prop, keyType, keyPrefix)
+		key, keyLoaded, err := captureType(ctx, *prop, keyType, keyPrefix)
 		if err != nil {
 			return err
 		}
@@ -406,7 +406,7 @@ func (prop *Property) fromArgsMap(ctx *Context, args *[]string) error {
 			return err
 		}
 
-		value, valueLoaded, err := captureType(ctx, args, *prop, valueType, valuePrefix)
+		value, valueLoaded, err := captureType(ctx, *prop, valueType, valuePrefix)
 		if err != nil {
 			return err
 		}
@@ -477,17 +477,17 @@ func (prop Property) getTemplateInput(argPrefix string, kind reflect.Kind, tpl *
 	}
 }
 
-func captureType(ctx *Context, args *[]string, prop Property, typ reflect.Type, argPrefix string) (reflect.Value, Flags[PropertyFlags], error) {
+func captureType(ctx *Context, prop Property, typ reflect.Type, argPrefix string) (reflect.Value, Flags[PropertyFlags], error) {
 	value := initializeType(typ)
-	flags, err := captureValue(ctx, args, prop, value, argPrefix)
+	flags, err := captureValue(ctx, prop, value, argPrefix)
 	return value, flags, err
 }
 
-func captureValue(ctx *Context, args *[]string, prop Property, value reflect.Value, argPrefix string) (Flags[PropertyFlags], error) {
+func captureValue(ctx *Context, prop Property, value reflect.Value, argPrefix string) (Flags[PropertyFlags], error) {
 	instance := GetSubInstance(value, prop)
 
 	ctx.ArgPrefix = argPrefix
-	err := instance.Capture(ctx, args)
+	err := instance.Capture(ctx)
 	if err != nil {
 		return Flags[PropertyFlags]{}, err
 	}

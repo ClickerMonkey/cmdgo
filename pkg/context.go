@@ -11,6 +11,7 @@ import (
 
 // A dynamic set of variables that commands can have access to during capture and execution.
 type Context struct {
+	Args                []string
 	Prompt              func(prompt string, prop Property) (string, error)
 	PromptStart         func(prop Property) (bool, error)
 	PromptContinue      func(prop Property) (bool, error)
@@ -28,13 +29,13 @@ type Context struct {
 }
 
 // A new context which uses std in & out for prompting
-func NewContext() *Context {
-	return NewContextFiles(os.Stdin, os.Stdout)
+func NewContext(args []string) *Context {
+	return NewContextFiles(args, os.Stdin, os.Stdout)
 }
 
 // A new context which uses the given files for prompting
-func NewContextFiles(in *os.File, out *os.File) *Context {
-	ctx := NewContextQuiet()
+func NewContextFiles(args []string, in *os.File, out *os.File) *Context {
+	ctx := NewContextQuiet(args)
 
 	reader := bufio.NewReader(os.Stdin)
 
@@ -87,8 +88,12 @@ func NewContextFiles(in *os.File, out *os.File) *Context {
 }
 
 // A new context which does not support prompting.
-func NewContextQuiet() *Context {
+func NewContextQuiet(args []string) *Context {
+	argsCopy := make([]string, len(args))
+	copy(argsCopy, args)
+
 	return &Context{
+		Args:                argsCopy,
 		Values:              make(map[string]any),
 		HelpPrompt:          "help!",
 		StartIndex:          1,
