@@ -100,5 +100,5 @@ Various struct tags can be used to control how values are pulled from arguments,
 - `max` The maximum allowed slice length, map length, string length, or numeric value (inclusive). When prompting for a map or slice and this length is met capturing will end for the value.
 - `env` The environment variables to look for to populate the field.
 - `arg` The override for the argument name. By default the argument is the normalized name of the field.
-  `arg:"msg"` (if ctx.ArgPrefix is -- then the user can specify this field value with --msg).
-  `arg:"-"` (does not pull value from the arguments)
+  - `arg:"msg"` (if ctx.ArgPrefix is -- then the user can specify this field value with --msg).
+  - `arg:"-"` (does not pull value from the arguments)
