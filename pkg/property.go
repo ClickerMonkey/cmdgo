@@ -179,8 +179,8 @@ func (prop Property) promptEnd(ctx *Context) error {
 }
 
 func (prop Property) promptMore(ctx *Context) (bool, error) {
-	if ctx.Prompt != nil && ctx.PromptContinue != nil && prop.PromptMore != "" {
-		more, err := ctx.PromptContinue(prop)
+	if ctx.Prompt != nil && ctx.PromptMore != nil && prop.PromptMore != "" {
+		more, err := ctx.PromptMore(prop)
 		if err != nil {
 			return false, err
 		}
@@ -269,7 +269,7 @@ func (prop *Property) fromArgsSlice(ctx *Context) error {
 			return err
 		}
 
-		if loaded.IsEmpty() && (prop.Min == nil || length+1 >= int(*prop.Min)) && (ctx.Prompt == nil || ctx.PromptContinue == nil) {
+		if loaded.IsEmpty() && (prop.Min == nil || length+1 >= int(*prop.Min)) && (ctx.Prompt == nil || ctx.PromptMore == nil) {
 			break
 		}
 
@@ -397,7 +397,7 @@ func (prop *Property) fromArgsMap(ctx *Context) error {
 			return err
 		}
 
-		if keyLoaded.IsEmpty() && (prop.Min == nil || length+1 >= int(*prop.Min)) && (ctx.Prompt == nil || ctx.PromptContinue == nil) {
+		if keyLoaded.IsEmpty() && (prop.Min == nil || length+1 >= int(*prop.Min)) && (ctx.Prompt == nil || ctx.PromptMore == nil) {
 			break
 		}
 

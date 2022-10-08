@@ -16,7 +16,9 @@ type Context struct {
 	PromptStart         func(prop Property) (bool, error)
 	PromptStartOptions  map[string]bool
 	PromptStartSuffix   string
-	PromptContinue      func(prop Property) (bool, error)
+	PromptMore          func(prop Property) (bool, error)
+	PromptMoreOptions   map[string]bool
+	PromptMoreSuffix    string
 	PromptEnd           func(prop Property) error
 	Values              map[string]any
 	HelpPrompt          string
@@ -53,12 +55,16 @@ func NewContextFiles(args []string, in *os.File, out *os.File) *Context {
 		}
 	}
 
-	ctx.PromptContinue = func(prop Property) (bool, error) {
-		more, err := ctx.Prompt(fmt.Sprintf("%s (y/n): ", prop.PromptMore), prop)
-		if err != nil {
-			return false, err
+	ctx.PromptMore = func(prop Property) (bool, error) {
+		for {
+			input, err := ctx.Prompt(prop.PromptMore+ctx.PromptMoreSuffix, prop)
+			if err != nil {
+				return false, err
+			}
+			if answer, ok := ctx.PromptMoreOptions[strings.ToLower(input)]; ok {
+				return answer, nil
+			}
 		}
-		return more == "" || strings.EqualFold(more, "y"), nil
 	}
 
 	ctx.PromptEnd = func(prop Property) error {
@@ -121,6 +127,8 @@ func NewContextQuiet(args []string) *Context {
 		ArgPrefix:           "--",
 		PromptStartOptions:  promptOptions,
 		PromptStartSuffix:   " (y/n): ",
+		PromptMoreOptions:   promptOptions,
+		PromptMoreSuffix:    " (y/n): ",
 		ArgStructTemplate:   newTemplate("{{ .Prefix }}{{ .Arg }}-"),
 		ArgSliceTemplate:    newTemplate("{{ .Prefix }}{{ .Arg }}{{ if not .IsSimple }}-{{ .Index }}-{{ end }}"),
 		ArgArrayTemplate:    newTemplate("{{ .Prefix }}{{ .Arg }}-{{ .Index }}{{ if not .IsSimple }}-{{ end }}"),
