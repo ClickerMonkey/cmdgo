@@ -253,7 +253,7 @@ func (prop *Property) fromArgsSlice(ctx Context, args *[]string) error {
 		ctx.ArgPrefix = argPrefix
 	}()
 
-	length := 0
+	length := slice.Len()
 
 	elementTemplate := prop.getTemplateInput(argPrefix, concreteType(elementType).Kind(), ctx.ArgSliceTemplate)
 
@@ -275,7 +275,7 @@ func (prop *Property) fromArgsSlice(ctx Context, args *[]string) error {
 
 		prop.Flags.Set(loaded.value)
 		slice = reflect.Append(slice, element)
-		length++
+		length = slice.Len()
 
 		if prop.Max != nil && length >= int(*prop.Max) {
 			break
@@ -378,7 +378,7 @@ func (prop *Property) fromArgsMap(ctx Context, args *[]string) error {
 	}()
 
 	argFlags := Flags[PropertyFlags]{}
-	length := 0
+	length := mp.Len()
 
 	keyTemplate := prop.getTemplateInput(argPrefix, concreteType(keyType).Kind(), ctx.ArgMapKeyTemplate)
 	valueTemplate := prop.getTemplateInput(argPrefix, concreteType(valueType).Kind(), ctx.ArgMapValueTemplate)
@@ -413,7 +413,7 @@ func (prop *Property) fromArgsMap(ctx Context, args *[]string) error {
 
 		argFlags.Set(keyLoaded.value | valueLoaded.value)
 		mp.SetMapIndex(key, value)
-		length++
+		length = mp.Len()
 
 		if prop.Max != nil && length >= int(*prop.Max) {
 			break
