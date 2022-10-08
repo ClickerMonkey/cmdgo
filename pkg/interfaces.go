@@ -7,7 +7,7 @@ package cmdgo
 // A command that can be executed after it's data is captured.
 type Executable interface {
 	// Executes the command
-	Execute(ctx Context) error
+	Execute(ctx *Context) error
 }
 
 // A dynamic command will have UpdateDynamic invoked before and after every property
@@ -17,11 +17,11 @@ type Executable interface {
 type Dynamic interface {
 	// The property just updated (or nil if this is the first call) and the map
 	// of command properties that can be dynamically updated
-	Update(ctx Context, updated *Property, instance *Instance) error
+	Update(ctx *Context, updated *Property, instance *Instance) error
 }
 
 // A command can be validated against the current context before it's executed. If an error
 // is returned then execution never happens.
 type Validator interface {
-	Validate(ctx Context) error
+	Validate(ctx *Context) error
 }

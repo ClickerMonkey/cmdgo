@@ -18,7 +18,7 @@ type Profile struct {
 	} `prompt-options:"start:Do you have any favorite movies?,end:,more:More?" arg:"movies"`
 }
 
-func (prof *Profile) Execute(ctx cmdgo.Context) error {
+func (prof *Profile) Execute(ctx *cmdgo.Context) error {
 	result, _ := json.Marshal(prof)
 	fmt.Printf("\nProfile: %s\n", result)
 

@@ -28,12 +28,12 @@ type Context struct {
 }
 
 // A new context which uses std in & out for prompting
-func NewContext() Context {
+func NewContext() *Context {
 	return NewContextFiles(os.Stdin, os.Stdout)
 }
 
 // A new context which uses the given files for prompting
-func NewContextFiles(in *os.File, out *os.File) Context {
+func NewContextFiles(in *os.File, out *os.File) *Context {
 	ctx := NewContextQuiet()
 
 	reader := bufio.NewReader(os.Stdin)
@@ -87,8 +87,8 @@ func NewContextFiles(in *os.File, out *os.File) Context {
 }
 
 // A new context which does not support prompting.
-func NewContextQuiet() Context {
-	return Context{
+func NewContextQuiet() *Context {
+	return &Context{
 		Values:              make(map[string]any),
 		HelpPrompt:          "help!",
 		StartIndex:          1,

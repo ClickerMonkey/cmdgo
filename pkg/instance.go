@@ -42,7 +42,7 @@ func GetSubInstance(value any, prop Property) Instance {
 	return instance
 }
 
-func (inst *Instance) Capture(ctx Context, args *[]string) error {
+func (inst *Instance) Capture(ctx *Context, args *[]string) error {
 	valueRaw := inst.Value.Interface()
 
 	if dynamic, ok := valueRaw.(Dynamic); ok {

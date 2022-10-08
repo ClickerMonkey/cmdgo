@@ -124,7 +124,7 @@ func (prop Property) CanFromArgs() bool {
 }
 
 // Loads value of the property from args if it can and it exists.
-func (prop *Property) FromArgs(ctx Context, args *[]string) error {
+func (prop *Property) FromArgs(ctx *Context, args *[]string) error {
 	if !prop.CanFromArgs() {
 		return nil
 	}
@@ -145,7 +145,7 @@ func (prop *Property) FromArgs(ctx Context, args *[]string) error {
 	return nil
 }
 
-func (prop *Property) fromArgsSimple(ctx Context, args *[]string) error {
+func (prop *Property) fromArgsSimple(ctx *Context, args *[]string) error {
 	value := GetArg(prop.Arg, "", args, ctx.ArgPrefix, prop.IsBool())
 	if value != "" {
 		return prop.Set(value, PropertyFlagArgs)
@@ -154,7 +154,7 @@ func (prop *Property) fromArgsSimple(ctx Context, args *[]string) error {
 	return nil
 }
 
-func (prop Property) promptStart(ctx Context) (bool, error) {
+func (prop Property) promptStart(ctx *Context) (bool, error) {
 	if prop.PromptStart == "-" {
 		return true, nil
 	}
@@ -167,7 +167,7 @@ func (prop Property) promptStart(ctx Context) (bool, error) {
 	return true, nil
 }
 
-func (prop Property) promptEnd(ctx Context) error {
+func (prop Property) promptEnd(ctx *Context) error {
 	if ctx.Prompt != nil && ctx.PromptEnd != nil && prop.PromptEnd != "" {
 		err := ctx.PromptEnd(prop)
 		if err != nil {
@@ -178,7 +178,7 @@ func (prop Property) promptEnd(ctx Context) error {
 	return nil
 }
 
-func (prop Property) promptMore(ctx Context) (bool, error) {
+func (prop Property) promptMore(ctx *Context) (bool, error) {
 	if ctx.Prompt != nil && ctx.PromptContinue != nil && prop.PromptMore != "" {
 		more, err := ctx.PromptContinue(prop)
 		if err != nil {
@@ -192,7 +192,7 @@ func (prop Property) promptMore(ctx Context) (bool, error) {
 	return true, nil
 }
 
-func (prop *Property) fromArgsStruct(ctx Context, args *[]string) error {
+func (prop *Property) fromArgsStruct(ctx *Context, args *[]string) error {
 	start, err := prop.promptStart(ctx)
 	if !start {
 		return err
@@ -234,7 +234,7 @@ func (prop *Property) fromArgsStruct(ctx Context, args *[]string) error {
 	return nil
 }
 
-func (prop *Property) fromArgsSlice(ctx Context, args *[]string) error {
+func (prop *Property) fromArgsSlice(ctx *Context, args *[]string) error {
 	start, err := prop.promptStart(ctx)
 	if !start {
 		return err
@@ -304,7 +304,7 @@ func (prop *Property) fromArgsSlice(ctx Context, args *[]string) error {
 	return nil
 }
 
-func (prop *Property) fromArgsArray(ctx Context, args *[]string) error {
+func (prop *Property) fromArgsArray(ctx *Context, args *[]string) error {
 	start, err := prop.promptStart(ctx)
 	if !start {
 		return err
@@ -357,7 +357,7 @@ func (prop *Property) fromArgsArray(ctx Context, args *[]string) error {
 	return nil
 }
 
-func (prop *Property) fromArgsMap(ctx Context, args *[]string) error {
+func (prop *Property) fromArgsMap(ctx *Context, args *[]string) error {
 	start, err := prop.promptStart(ctx)
 	if !start {
 		return err
@@ -477,13 +477,13 @@ func (prop Property) getTemplateInput(argPrefix string, kind reflect.Kind, tpl *
 	}
 }
 
-func captureType(ctx Context, args *[]string, prop Property, typ reflect.Type, argPrefix string) (reflect.Value, Flags[PropertyFlags], error) {
+func captureType(ctx *Context, args *[]string, prop Property, typ reflect.Type, argPrefix string) (reflect.Value, Flags[PropertyFlags], error) {
 	value := initializeType(typ)
 	flags, err := captureValue(ctx, args, prop, value, argPrefix)
 	return value, flags, err
 }
 
-func captureValue(ctx Context, args *[]string, prop Property, value reflect.Value, argPrefix string) (Flags[PropertyFlags], error) {
+func captureValue(ctx *Context, args *[]string, prop Property, value reflect.Value, argPrefix string) (Flags[PropertyFlags], error) {
 	instance := GetSubInstance(value, prop)
 
 	ctx.ArgPrefix = argPrefix
@@ -504,7 +504,7 @@ func (prop Property) CanPrompt() bool {
 }
 
 // Prompts the user for the value of this property if configured to do so.
-func (prop *Property) Prompt(ctx Context) error {
+func (prop *Property) Prompt(ctx *Context) error {
 	if !prop.CanPrompt() {
 		return nil
 	}
@@ -516,36 +516,12 @@ func (prop *Property) Prompt(ctx Context) error {
 	switch {
 	case prop.IsSimple():
 		return prop.promptSimple(ctx)
-	case prop.IsStruct():
-		return prop.promptStruct(ctx)
-	case prop.IsSlice():
-		return prop.promptSlice(ctx)
-	case prop.IsArray():
-		return prop.promptArray(ctx)
-	case prop.IsMap():
-		return prop.promptMap(ctx)
 	}
 
 	return nil
 }
 
-func (prop *Property) promptStruct(ctx Context) error {
-	return nil
-}
-
-func (prop *Property) promptArray(ctx Context) error {
-	return nil
-}
-
-func (prop *Property) promptSlice(ctx Context) error {
-	return nil
-}
-
-func (prop *Property) promptMap(ctx Context) error {
-	return nil
-}
-
-func (prop *Property) promptSimple(ctx Context) error {
+func (prop *Property) promptSimple(ctx *Context) error {
 	currentValue := prop.Value.Interface()
 	isDefault := isDefaultValue(currentValue)
 

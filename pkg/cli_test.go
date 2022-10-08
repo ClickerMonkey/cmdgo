@@ -11,7 +11,7 @@ type SimpleCommand struct {
 
 var _ Executable = &SimpleCommand{}
 
-func (cmd *SimpleCommand) Execute(ctx Context) error {
+func (cmd *SimpleCommand) Execute(ctx *Context) error {
 	ctx.Values["result"] = cmd.Message
 	return nil
 }

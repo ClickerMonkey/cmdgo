@@ -11,7 +11,9 @@ type Echo struct {
 	Message string `prompt:"Enter message" help:"The message to enter" default:"Hello World" min:"2" env:"ECHO_MESSAGE" arg:"msg"`
 }
 
-func (echo *Echo) Execute(ctx cmdgo.Context) error {
+var _ cmdgo.Executable = &Echo{}
+
+func (echo *Echo) Execute(ctx *cmdgo.Context) error {
 	fmt.Printf("ECHO: %s\n", echo.Message)
 	return nil
 }

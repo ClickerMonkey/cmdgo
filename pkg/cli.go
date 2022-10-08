@@ -10,7 +10,7 @@ import (
 	"github.com/go-yaml/yaml"
 )
 
-func Execute(ctx Context, args []string) error {
+func Execute(ctx *Context, args []string) error {
 	cmd, err := Capture(ctx, args)
 	if err != nil {
 		return err
@@ -25,7 +25,7 @@ func Execute(ctx Context, args []string) error {
 
 type CaptureImporter func(data []byte, target any) error
 
-func Capture(ctx Context, args []string) (any, error) {
+func Capture(ctx *Context, args []string) (any, error) {
 	if len(args) == 0 {
 		return nil, fmt.Errorf("No command given.")
 	}
