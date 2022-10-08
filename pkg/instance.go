@@ -33,6 +33,7 @@ func GetSubInstance(value any, prop Property) Instance {
 			Value:       instance.Value,
 			Type:        instance.Value.Type(),
 			Name:        prop.Name,
+			PromptText:  prop.PromptText,
 			PromptMulti: prop.PromptMulti,
 			Options:     prop.Options,
 		})

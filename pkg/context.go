@@ -12,6 +12,9 @@ import (
 // A dynamic set of variables that commands can have access to during capture and execution.
 type Context struct {
 	Prompt              func(prompt string, prop Property) (string, error)
+	PromptStart         func(prop Property) (bool, error)
+	PromptContinue      func(prop Property) (bool, error)
+	PromptEnd           func(prop Property) error
 	Values              map[string]any
 	HelpPrompt          string
 	DisplayHelp         func(prop Property)
@@ -35,8 +38,32 @@ func NewContextFiles(in *os.File, out *os.File) Context {
 
 	reader := bufio.NewReader(os.Stdin)
 
+	ctx.PromptStart = func(prop Property) (bool, error) {
+		start, err := ctx.Prompt(fmt.Sprintf("%s (y/n): ", prop.PromptStart), prop)
+		if err != nil {
+			return false, err
+		}
+		return start == "" || strings.EqualFold(start, "y"), nil
+	}
+
+	ctx.PromptContinue = func(prop Property) (bool, error) {
+		more, err := ctx.Prompt(fmt.Sprintf("%s (y/n): ", prop.PromptMore), prop)
+		if err != nil {
+			return false, err
+		}
+		return more == "" || strings.EqualFold(more, "y"), nil
+	}
+
+	ctx.PromptEnd = func(prop Property) error {
+		_, err := fmt.Fprintf(out, "%s\n", prop.PromptEnd)
+		return err
+	}
+
 	ctx.Prompt = func(prompt string, prop Property) (string, error) {
-		fmt.Fprintf(out, prompt)
+		_, err := fmt.Fprintf(out, prompt)
+		if err != nil {
+			return "", err
+		}
 		input := ""
 		for {
 			line, err := reader.ReadString('\n')

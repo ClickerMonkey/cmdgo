@@ -22,8 +22,14 @@ type Property struct {
 	HidePrompt bool
 	// Text to display when prompting the user. ex: `prompt:"Enter value"`
 	PromptText string
-	// If the prompt can contain multiple lines and we only stop prompting on an empty line.ex: `prompt-multi:"true"`
+	// If the prompt can contain multiple lines and we only stop prompting on an empty line.ex: `prompt-options:"multi"`
 	PromptMulti bool
+	// If the prompt should ask before it starts to populate a complex type (default true). ex: `prompt-options:"start:"` or `prompt-options:"start:Do you have any favorite numbers (y/n)?"`
+	PromptStart string
+	// If the prompt should ask before it starts to populate a complex type (default true). ex: `prompt-options:"end:"` or `prompt-options:"end:Thank you for your favorite numbers."`
+	PromptEnd string
+	// The text to display when questioning for more. ex: `prompt-options:"more:More?"`
+	PromptMore string
 	// Help text to display for this property if requested by the user. ex: `help:"your help text here"`
 	Help string
 	// If the default value should be shown to the user. ex: `default-mode:"hide"`
@@ -148,7 +154,50 @@ func (prop *Property) fromArgsSimple(ctx Context, args *[]string) error {
 	return nil
 }
 
+func (prop Property) promptStart(ctx Context) (bool, error) {
+	if prop.PromptStart == "-" {
+		return true, nil
+	}
+	if ctx.Prompt != nil && ctx.PromptStart != nil && prop.PromptStart != "" {
+		if start, err := ctx.PromptStart(prop); !start || err != nil {
+			return false, err
+		}
+	}
+
+	return true, nil
+}
+
+func (prop Property) promptEnd(ctx Context) error {
+	if ctx.Prompt != nil && ctx.PromptEnd != nil && prop.PromptEnd != "" {
+		err := ctx.PromptEnd(prop)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (prop Property) promptMore(ctx Context) (bool, error) {
+	if ctx.Prompt != nil && ctx.PromptContinue != nil && prop.PromptMore != "" {
+		more, err := ctx.PromptContinue(prop)
+		if err != nil {
+			return false, err
+		}
+		if !more {
+			return false, nil
+		}
+	}
+
+	return true, nil
+}
+
 func (prop *Property) fromArgsStruct(ctx Context, args *[]string) error {
+	start, err := prop.promptStart(ctx)
+	if !start {
+		return err
+	}
+
 	value := prop.Value
 	if prop.IsOptional() && value.IsNil() {
 		value = reflect.New(value.Type().Elem())
@@ -177,10 +226,20 @@ func (prop *Property) fromArgsStruct(ctx Context, args *[]string) error {
 		prop.Value.Set(value)
 	}
 
+	err = prop.promptEnd(ctx)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
 func (prop *Property) fromArgsSlice(ctx Context, args *[]string) error {
+	start, err := prop.promptStart(ctx)
+	if !start {
+		return err
+	}
+
 	value := prop.Value
 	sliceType := concreteType(value.Type())
 	if value.IsNil() {
@@ -210,7 +269,7 @@ func (prop *Property) fromArgsSlice(ctx Context, args *[]string) error {
 			return err
 		}
 
-		if loaded.IsEmpty() && (prop.Min == nil || length+1 >= int(*prop.Min)) {
+		if loaded.IsEmpty() && (prop.Min == nil || length+1 >= int(*prop.Min)) && (ctx.Prompt == nil || ctx.PromptContinue == nil) {
 			break
 		}
 
@@ -221,16 +280,34 @@ func (prop *Property) fromArgsSlice(ctx Context, args *[]string) error {
 		if prop.Max != nil && length >= int(*prop.Max) {
 			break
 		}
+
+		more, err := prop.promptMore(ctx)
+		if err != nil {
+			return err
+		}
+		if !more {
+			break
+		}
 	}
 
 	if length > 0 {
 		setConcrete(prop.Value, slice)
 	}
 
+	err = prop.promptEnd(ctx)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
 func (prop *Property) fromArgsArray(ctx Context, args *[]string) error {
+	start, err := prop.promptStart(ctx)
+	if !start {
+		return err
+	}
+
 	value := prop.Value
 	arrayType := concreteType(value.Type())
 	if value.Kind() == reflect.Pointer && value.IsNil() {
@@ -270,10 +347,20 @@ func (prop *Property) fromArgsArray(ctx Context, args *[]string) error {
 		setConcrete(prop.Value, array)
 	}
 
+	err = prop.promptEnd(ctx)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
 func (prop *Property) fromArgsMap(ctx Context, args *[]string) error {
+	start, err := prop.promptStart(ctx)
+	if !start {
+		return err
+	}
+
 	value := prop.Value
 	mapType := concreteType(value.Type())
 	keyType := mapType.Key()
@@ -308,7 +395,7 @@ func (prop *Property) fromArgsMap(ctx Context, args *[]string) error {
 			return err
 		}
 
-		if keyLoaded.IsEmpty() && (prop.Min == nil || length+1 >= int(*prop.Min)) {
+		if keyLoaded.IsEmpty() && (prop.Min == nil || length+1 >= int(*prop.Min)) && (ctx.Prompt == nil || ctx.PromptContinue == nil) {
 			break
 		}
 
@@ -329,12 +416,25 @@ func (prop *Property) fromArgsMap(ctx Context, args *[]string) error {
 		if prop.Max != nil && length >= int(*prop.Max) {
 			break
 		}
+
+		more, err := prop.promptMore(ctx)
+		if err != nil {
+			return err
+		}
+		if !more {
+			break
+		}
 	}
 
 	prop.Flags.Set(argFlags.value)
 
 	if mp != prop.Value && !argFlags.IsEmpty() {
 		setConcrete(prop.Value, mp)
+	}
+
+	err = prop.promptEnd(ctx)
+	if err != nil {
+		return err
 	}
 
 	return nil
@@ -659,8 +759,33 @@ func getStructProperty(field reflect.StructField, value reflect.Value) Property 
 		}
 	}
 
-	if promptMulti, ok := field.Tag.Lookup("prompt-multi"); ok {
-		prop.PromptMulti, _ = strconv.ParseBool(promptMulti)
+	prop.PromptStart = fmt.Sprintf("%s?", prop.PromptText)
+	prop.PromptMore = fmt.Sprintf("More %s?", prop.PromptText)
+	prop.PromptEnd = fmt.Sprintf("End %s", prop.PromptText)
+
+	if promptOptionsText, ok := field.Tag.Lookup("prompt-options"); ok {
+		promptOptions := strings.Split(promptOptionsText, ",")
+		for _, opt := range promptOptions {
+			if opt == "" {
+				continue
+			}
+			keyValue := strings.Split(opt, ":")
+			key := strings.ToLower(keyValue[0])
+			value := ""
+			if len(keyValue) >= 2 {
+				value = keyValue[1]
+			}
+			switch key {
+			case "multi":
+				prop.PromptMulti = true
+			case "start":
+				prop.PromptStart = value
+			case "end":
+				prop.PromptEnd = value
+			case "more":
+				prop.PromptMore = value
+			}
+		}
 	}
 
 	if help, ok := field.Tag.Lookup("help"); ok {
