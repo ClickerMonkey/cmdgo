@@ -68,6 +68,6 @@ ECHO: From json!
 ECHO: From xml!
 
 > ./myprogram echo --yaml path/to/yaml/file
-# Message: From yaml!
+# message: From yaml!
 ECHO: From yaml!
 ```

@@ -55,16 +55,13 @@ func TestSimple(t *testing.T) {
 	for _, test := range tests {
 		actualHelps := []string{}
 
-		ctx := Context{
-			HelpPrompt: "help!",
-			ArgPrefix:  "-",
-			Values:     make(map[string]any),
-			Prompt: func(prompt string, prop Property) (string, error) {
-				return test.prompts[prompt], nil
-			},
-			DisplayHelp: func(prop Property) {
-				actualHelps = append(actualHelps, prop.Help)
-			},
+		ctx := NewContextQuiet()
+		ctx.ArgPrefix = "-"
+		ctx.Prompt = func(prompt string, prop Property) (string, error) {
+			return test.prompts[prompt], nil
+		}
+		ctx.DisplayHelp = func(prop Property) {
+			actualHelps = append(actualHelps, prop.Help)
 		}
 
 		err := Execute(ctx, append([]string{"simple"}, test.args...))
@@ -174,37 +171,37 @@ func TestVaried(t *testing.T) {
 		},
 		{
 			name:     "intslice",
-			args:     []string{"-intslice-0", "1", "-intslice-1", "2"},
+			args:     []string{"-intslice", "1", "-intslice", "2"},
 			expected: VariedCommand{IntSlice: []int{1, 2}},
 		},
 		{
 			name:     "structslice",
-			args:     []string{"-structslice-0-prop", "1", "-structslice-1-prop", "2"},
+			args:     []string{"-structslice-1-prop", "1", "-structslice-2-prop", "2"},
 			expected: VariedCommand{StructSlice: []SimpleStruct{{Prop: "1"}, {Prop: "2"}}},
 		},
 		{
 			name:     "nilstructslice",
-			args:     []string{"-nilstructslice-0-prop", "1"},
+			args:     []string{"-nilstructslice-1-prop", "1"},
 			expected: VariedCommand{NilStructSlice: ptrTo([]SimpleStruct{{Prop: "1"}})},
 		},
 		{
 			name:     "array0",
-			args:     []string{"-array-0", "1"},
+			args:     []string{"-array-1", "1"},
 			expected: VariedCommand{Array: [2]int{1, 0}},
 		},
 		{
 			name:     "array1",
-			args:     []string{"-array-1", "2"},
+			args:     []string{"-array-2", "2"},
 			expected: VariedCommand{Array: [2]int{0, 2}},
 		},
 		{
 			name:     "nilarray0",
-			args:     []string{"-nilarray-0", "1"},
+			args:     []string{"-nilarray-1", "1"},
 			expected: VariedCommand{NilArray: ptrTo([2]int{1, 0})},
 		},
 		{
 			name:     "nillarray1",
-			args:     []string{"-nilarray-1", "2"},
+			args:     []string{"-nilarray-2", "2"},
 			expected: VariedCommand{NilArray: ptrTo([2]int{0, 2})},
 		},
 		{
@@ -215,9 +212,8 @@ func TestVaried(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		ctx := Context{
-			ArgPrefix: "-",
-		}
+		ctx := NewContextQuiet()
+		ctx.ArgPrefix = "-"
 
 		captured, err := Capture(ctx, append([]string{"varied"}, test.args...))
 		if err != nil {

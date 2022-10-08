@@ -14,20 +14,21 @@ func Normalize(x string) string {
 	return strings.ToLower(string(normalizer.ReplaceAll([]byte(x), []byte(""))))
 }
 
-func GetArg(name string, defaultValue string, args []string, argPrefix string, flag bool) string {
+func GetArg(name string, defaultValue string, args *[]string, argPrefix string, flag bool) string {
 	normal := Normalize(name)
 	erase := 0
 	index := 0
 	value := defaultValue
 	lowerPrefix := strings.ToLower(argPrefix)
-	for index < len(args) {
-		arg := args[index]
+	argsNow := *args
+	for index < len(argsNow) {
+		arg := argsNow[index]
 		if strings.HasPrefix(strings.ToLower(arg), lowerPrefix) {
 			key := Normalize(arg[len(argPrefix):])
 			if key == normal {
 				erase = 1
-				if index+1 < len(args) {
-					value = args[index+1]
+				if index+1 < len(argsNow) {
+					value = argsNow[index+1]
 					if strings.HasPrefix(strings.ToLower(value), lowerPrefix) {
 						value = defaultValue
 					} else {
@@ -47,7 +48,7 @@ func GetArg(name string, defaultValue string, args []string, argPrefix string, f
 	}
 
 	if erase > 0 {
-		args = append(args[0:index], args[index+erase:]...)
+		*args = append(argsNow[0:index], argsNow[index+erase:]...)
 	}
 
 	return value

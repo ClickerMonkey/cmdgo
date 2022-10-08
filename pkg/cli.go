@@ -44,11 +44,11 @@ func Capture(ctx Context, args []string) (any, error) {
 		interactiveDefault = "true"
 	}
 
-	interactive, _ := strconv.ParseBool(GetArg("interactive", interactiveDefault, args, ctx.ArgPrefix, true))
+	interactive, _ := strconv.ParseBool(GetArg("interactive", interactiveDefault, &args, ctx.ArgPrefix, true))
 	commandInstance := GetInstance(command)
 
 	for arg, importer := range CaptureImports {
-		path := GetArg(arg, "", args, ctx.ArgPrefix, false)
+		path := GetArg(arg, "", &args, ctx.ArgPrefix, false)
 		if path != "" {
 			imported, err := ioutil.ReadFile(path)
 			if err != nil {
@@ -66,7 +66,7 @@ func Capture(ctx Context, args []string) (any, error) {
 		ctx.Prompt = nil
 	}
 
-	err := commandInstance.Capture(ctx, args)
+	err := commandInstance.Capture(ctx, &args)
 	ctx.Prompt = prompter
 
 	if err != nil {

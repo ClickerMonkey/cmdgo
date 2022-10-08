@@ -1,11 +1,13 @@
 package cmdgo
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"reflect"
 	"strconv"
 	"strings"
+	"text/template"
 )
 
 // A command property parsed from a command struct.
@@ -40,10 +42,6 @@ type Property struct {
 	Env []string
 	// Arg name for this property. Defaults to the field name. ex: `arg:"my-flag"`
 	Arg string
-	// Arg prefix for when this property points to a complex type with inner properties.
-	// By default it's the arg of this property with a hyphen appended to it.
-	// For no prefix for inner properties specify an empty string. ex: `arg-prefix:""`
-	ArgPrefix string
 	// Flags that represent how
 	Flags Flags[PropertyFlags]
 }
@@ -120,7 +118,7 @@ func (prop Property) CanFromArgs() bool {
 }
 
 // Loads value of the property from args if it can and it exists.
-func (prop *Property) FromArgs(ctx Context, args []string) error {
+func (prop *Property) FromArgs(ctx Context, args *[]string) error {
 	if !prop.CanFromArgs() {
 		return nil
 	}
@@ -141,7 +139,7 @@ func (prop *Property) FromArgs(ctx Context, args []string) error {
 	return nil
 }
 
-func (prop *Property) fromArgsSimple(ctx Context, args []string) error {
+func (prop *Property) fromArgsSimple(ctx Context, args *[]string) error {
 	value := GetArg(prop.Arg, "", args, ctx.ArgPrefix, prop.IsBool())
 	if value != "" {
 		return prop.Set(value, PropertyFlagArgs)
@@ -150,7 +148,7 @@ func (prop *Property) fromArgsSimple(ctx Context, args []string) error {
 	return nil
 }
 
-func (prop *Property) fromArgsStruct(ctx Context, args []string) error {
+func (prop *Property) fromArgsStruct(ctx Context, args *[]string) error {
 	value := prop.Value
 	if prop.IsOptional() && value.IsNil() {
 		value = reflect.New(value.Type().Elem())
@@ -161,7 +159,14 @@ func (prop *Property) fromArgsStruct(ctx Context, args []string) error {
 		ctx.ArgPrefix = argPrefix
 	}()
 
-	flags, err := captureValue(ctx, args, *prop, value, argPrefix+prop.ArgPrefix)
+	structTemplate := prop.getTemplateInput(argPrefix, reflect.Struct, ctx.ArgStructTemplate)
+
+	prefix, err := structTemplate.get()
+	if err != nil {
+		return err
+	}
+
+	flags, err := captureValue(ctx, args, *prop, value, prefix)
 	if err != nil {
 		return err
 	}
@@ -175,7 +180,7 @@ func (prop *Property) fromArgsStruct(ctx Context, args []string) error {
 	return nil
 }
 
-func (prop *Property) fromArgsSlice(ctx Context, args []string) error {
+func (prop *Property) fromArgsSlice(ctx Context, args *[]string) error {
 	value := prop.Value
 	sliceType := concreteType(value.Type())
 	if value.IsNil() {
@@ -189,13 +194,15 @@ func (prop *Property) fromArgsSlice(ctx Context, args []string) error {
 		ctx.ArgPrefix = argPrefix
 	}()
 
-	index := ctx.StartIndex
 	length := 0
 
+	elementTemplate := prop.getTemplateInput(argPrefix, concreteType(elementType).Kind(), ctx.ArgSliceTemplate)
+
 	for {
-		elementPrefix := argPrefix + prop.ArgPrefix + strconv.FormatInt(index, 10)
-		if concreteType(elementType).Kind() == reflect.Struct {
-			elementPrefix += "-"
+		elementTemplate.Index = length + ctx.StartIndex
+		elementPrefix, err := elementTemplate.get()
+		if err != nil {
+			return err
 		}
 
 		element, loaded, err := captureType(ctx, args, *prop, elementType, elementPrefix)
@@ -209,7 +216,6 @@ func (prop *Property) fromArgsSlice(ctx Context, args []string) error {
 
 		prop.Flags.Set(loaded.value)
 		slice = reflect.Append(slice, element)
-		index++
 		length++
 
 		if prop.Max != nil && length >= int(*prop.Max) {
@@ -217,14 +223,14 @@ func (prop *Property) fromArgsSlice(ctx Context, args []string) error {
 		}
 	}
 
-	if index > ctx.StartIndex {
+	if length > 0 {
 		setConcrete(prop.Value, slice)
 	}
 
 	return nil
 }
 
-func (prop *Property) fromArgsArray(ctx Context, args []string) error {
+func (prop *Property) fromArgsArray(ctx Context, args *[]string) error {
 	value := prop.Value
 	arrayType := concreteType(value.Type())
 	if value.Kind() == reflect.Pointer && value.IsNil() {
@@ -237,14 +243,17 @@ func (prop *Property) fromArgsArray(ctx Context, args []string) error {
 		ctx.ArgPrefix = argPrefix
 	}()
 
-	index := ctx.StartIndex
 	argFlags := Flags[PropertyFlags]{}
 
+	elementTemplate := prop.getTemplateInput(argPrefix, concreteType(arrayType.Elem()).Kind(), ctx.ArgArrayTemplate)
+
 	for i := 0; i < arrayType.Len(); i++ {
+		elementTemplate.Index = i + ctx.StartIndex
+
 		element := initialize(array.Index(i))
-		elementPrefix := argPrefix + prop.ArgPrefix + strconv.FormatInt(index, 10)
-		if concreteKind(element) == reflect.Struct {
-			elementPrefix += "-"
+		elementPrefix, err := elementTemplate.get()
+		if err != nil {
+			return err
 		}
 
 		loaded, err := captureValue(ctx, args, *prop, element, elementPrefix)
@@ -253,7 +262,6 @@ func (prop *Property) fromArgsArray(ctx Context, args []string) error {
 		}
 
 		argFlags.Set(loaded.value)
-		index++
 	}
 
 	prop.Flags.Set(argFlags.value)
@@ -265,7 +273,7 @@ func (prop *Property) fromArgsArray(ctx Context, args []string) error {
 	return nil
 }
 
-func (prop *Property) fromArgsMap(ctx Context, args []string) error {
+func (prop *Property) fromArgsMap(ctx Context, args *[]string) error {
 	value := prop.Value
 	mapType := concreteType(value.Type())
 	keyType := mapType.Key()
@@ -283,8 +291,19 @@ func (prop *Property) fromArgsMap(ctx Context, args []string) error {
 	argFlags := Flags[PropertyFlags]{}
 	length := 0
 
+	keyTemplate := prop.getTemplateInput(argPrefix, concreteType(keyType).Kind(), ctx.ArgMapKeyTemplate)
+	valueTemplate := prop.getTemplateInput(argPrefix, concreteType(valueType).Kind(), ctx.ArgMapValueTemplate)
+
 	for {
-		key, keyLoaded, err := captureType(ctx, args, *prop, keyType, argPrefix+prop.ArgPrefix+"key")
+		keyTemplate.Index = length + ctx.StartIndex
+		valueTemplate.Index = length + ctx.StartIndex
+
+		keyPrefix, err := keyTemplate.get()
+		if err != nil {
+			return err
+		}
+
+		key, keyLoaded, err := captureType(ctx, args, *prop, keyType, keyPrefix)
 		if err != nil {
 			return err
 		}
@@ -293,7 +312,12 @@ func (prop *Property) fromArgsMap(ctx Context, args []string) error {
 			break
 		}
 
-		value, valueLoaded, err := captureType(ctx, args, *prop, valueType, argPrefix+prop.ArgPrefix+"value")
+		valuePrefix, err := valueTemplate.get()
+		if err != nil {
+			return err
+		}
+
+		value, valueLoaded, err := captureType(ctx, args, *prop, valueType, valuePrefix)
 		if err != nil {
 			return err
 		}
@@ -316,13 +340,46 @@ func (prop *Property) fromArgsMap(ctx Context, args []string) error {
 	return nil
 }
 
-func captureType(ctx Context, args []string, prop Property, typ reflect.Type, argPrefix string) (reflect.Value, Flags[PropertyFlags], error) {
+type ArgTemplate struct {
+	Template *template.Template
+	Prefix   string
+	Arg      string
+	Index    int
+	IsSimple bool
+	IsStruct bool
+	IsSlice  bool
+	IsMap    bool
+	IsArray  bool
+}
+
+func (input ArgTemplate) get() (string, error) {
+	var out bytes.Buffer
+	if err := input.Template.Execute(&out, input); err != nil {
+		return "", err
+	}
+	return out.String(), nil
+}
+
+func (prop Property) getTemplateInput(argPrefix string, kind reflect.Kind, tpl *template.Template) ArgTemplate {
+	return ArgTemplate{
+		Template: tpl,
+		Prefix:   argPrefix,
+		Arg:      prop.Arg,
+		IsSimple: !(kind == reflect.Struct || kind == reflect.Array || kind == reflect.Slice || kind == reflect.Map),
+		IsSlice:  kind == reflect.Slice,
+		IsStruct: kind == reflect.Struct,
+		IsArray:  kind == reflect.Array,
+		IsMap:    kind == reflect.Map,
+	}
+}
+
+func captureType(ctx Context, args *[]string, prop Property, typ reflect.Type, argPrefix string) (reflect.Value, Flags[PropertyFlags], error) {
 	value := initializeType(typ)
 	flags, err := captureValue(ctx, args, prop, value, argPrefix)
 	return value, flags, err
 }
 
-func captureValue(ctx Context, args []string, prop Property, value reflect.Value, argPrefix string) (Flags[PropertyFlags], error) {
+func captureValue(ctx Context, args *[]string, prop Property, value reflect.Value, argPrefix string) (Flags[PropertyFlags], error) {
 	instance := GetSubInstance(value, prop)
 
 	ctx.ArgPrefix = argPrefix
@@ -630,12 +687,6 @@ func getStructProperty(field reflect.StructField, value reflect.Value) Property 
 		prop.Arg = Normalize(arg)
 	} else {
 		prop.Arg = prop.Name
-	}
-
-	if argPrefix, ok := field.Tag.Lookup("arg-prefix"); ok {
-		prop.ArgPrefix = argPrefix
-	} else {
-		prop.ArgPrefix = prop.Arg + "-"
 	}
 
 	if min, ok := field.Tag.Lookup("min"); ok {

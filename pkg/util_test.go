@@ -55,7 +55,7 @@ func TestGetArg(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		actual := GetArg(test.name, test.defaultValue, test.args, "-", test.flag)
+		actual := GetArg(test.name, test.defaultValue, &test.args, "-", test.flag)
 		if actual != test.expected {
 			t.Errorf("Expected %s but got %s", test.expected, actual)
 		}
