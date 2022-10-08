@@ -1,0 +1,12 @@
+name: ClickerMonkey
+age: 33
+favenumbers:
+  - 1
+  - 3
+  - 7
+  - 9
+favemovies:
+  - title: Lord of the Rings
+    rating: 10
+  - title: Matrix
+    rating: 8.67

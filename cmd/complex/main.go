@@ -11,16 +11,17 @@ import (
 type Profile struct {
 	Name        string `prompt:"Your name" min:"2"`
 	Age         *int   `prompt:"Your age"`
-	FaveNumbers []int  `prompt:"Favorite numbers" prompt-options:"start:-,end:,more:More?"`
+	FaveNumbers []int  `prompt:"Favorite numbers" prompt-options:"start:-,end:,more:More?" arg:"favenum"`
 	FaveMovies  []struct {
 		Title  string
 		Rating float32 `prompt:"Rating (0-10)" min:"0" max:"10"`
-	} `prompt:"Favorite movies" prompt-options:"start:Do you have any favorite movies?,end:,more:More?"`
+	} `prompt-options:"start:Do you have any favorite movies?,end:,more:More?" arg:"movies"`
 }
 
 func (prof *Profile) Execute(ctx cmdgo.Context) error {
 	result, _ := json.Marshal(prof)
-	fmt.Printf("Profile: %s\n", result)
+	fmt.Printf("\nProfile: %s\n", result)
+
 	return nil
 }
 
