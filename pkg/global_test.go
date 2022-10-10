@@ -2,6 +2,8 @@ package cmdgo
 
 import (
 	"encoding/json"
+	"fmt"
+	"strings"
 	"testing"
 )
 
@@ -230,9 +232,210 @@ func TestVaried(t *testing.T) {
 
 		captured, err := Capture(ctx)
 		if err != nil {
-			t.Errorf("Test %s failed with error %v", test.name, err)
+			t.Errorf("Test [%s] failed with error %v", test.name, err)
 		} else if !equalsJson(captured, test.expected) {
-			t.Errorf("Test %s failed, expected %+v got %+v", test.name, toJson(test.expected), toJson(captured))
+			t.Errorf("Test [%s] failed, expected %+v got %+v", test.name, toJson(test.expected), toJson(captured))
+		}
+	}
+}
+
+type RepromptMapCommand struct {
+	Map map[string]int
+}
+
+func TestRepromptMapValues(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    RepromptMapCommand
+		expected RepromptMapCommand
+		prompts  []string
+	}{
+		{
+			name:     "empty",
+			input:    RepromptMapCommand{},
+			expected: RepromptMapCommand{},
+			prompts: []string{
+				"Map? (y/n): n",
+			},
+		},
+		{
+			name:  "map empty",
+			input: RepromptMapCommand{},
+			prompts: []string{
+				"Map? (y/n): y",
+				"Map key: a",
+				"Map [a]: 1",
+				"More Map? (y/n): n",
+			},
+			expected: RepromptMapCommand{
+				Map: map[string]int{
+					"a": 1,
+				},
+			},
+		},
+		{
+			name: "map reprompt only",
+			input: RepromptMapCommand{
+				Map: map[string]int{
+					"a": 1,
+				},
+			},
+			prompts: []string{
+				"Map? (y/n): y",
+				"Map [a] (1): 2",
+				"More Map? (y/n): n",
+			},
+			expected: RepromptMapCommand{
+				Map: map[string]int{
+					"a": 2,
+				},
+			},
+		},
+		{
+			name: "map reprompt and additional",
+			input: RepromptMapCommand{
+				Map: map[string]int{
+					"a": 1,
+				},
+			},
+			prompts: []string{
+				"Map? (y/n): y",
+				"Map [a] (1): 2",
+				"More Map? (y/n): y",
+				"Map key: b",
+				"Map [b]: 3",
+				"More Map? (y/n): n",
+			},
+			expected: RepromptMapCommand{
+				Map: map[string]int{
+					"a": 2,
+					"b": 3,
+				},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		ctx := NewContext()
+		ctx.ArgPrefix = "-"
+		ctx.RepromptMapValues = true
+		ctx.ForcePrompt = true
+		ctx.Prompt = func(prompt string, prop Property) (string, error) {
+			if len(test.prompts) == 0 {
+				return "", fmt.Errorf("No input left for prompt '%s'", prompt)
+			}
+			line := test.prompts[0]
+			test.prompts = test.prompts[1:]
+			if strings.HasPrefix(line, prompt) {
+				return line[len(prompt):], nil
+			} else {
+				return "", fmt.Errorf("Prompted '%s', got '%s'", prompt, line)
+			}
+		}
+
+		err := Unmarshal(ctx, &test.input)
+		if err != nil {
+			t.Errorf("Test [%s] failed with error %v", test.name, err)
+		} else if !equalsJson(test.input, test.expected) {
+			t.Errorf("Test [%s] failed, expected %+v got %+v", test.name, toJson(test.expected), toJson(test.input))
+		}
+	}
+}
+
+type RepromptSliceCommand struct {
+	Slice []int
+}
+
+func TestRepromptSlice(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    RepromptSliceCommand
+		expected RepromptSliceCommand
+		prompts  []string
+	}{
+		{
+			name:     "empty",
+			input:    RepromptSliceCommand{},
+			expected: RepromptSliceCommand{},
+			prompts: []string{
+				"Slice? (y/n): n",
+			},
+		},
+		{
+			name:  "slice empty",
+			input: RepromptSliceCommand{},
+			prompts: []string{
+				"Slice? (y/n): y",
+				"Slice: 1",
+				"More Slice? (y/n): y",
+				"Slice: 2",
+				"More Slice? (y/n): n",
+			},
+			expected: RepromptSliceCommand{
+				Slice: []int{1, 2},
+			},
+		},
+		{
+			name: "slice reprompt 1",
+			input: RepromptSliceCommand{
+				Slice: []int{1},
+			},
+			prompts: []string{
+				"Slice? (y/n): y",
+				"Slice [0] (1): 3",
+				"More Slice? (y/n): y",
+				"Slice: 2",
+				"More Slice? (y/n): n",
+			},
+			expected: RepromptSliceCommand{
+				Slice: []int{3, 2},
+			},
+		},
+		{
+			name: "slice reprompt 3",
+			input: RepromptSliceCommand{
+				Slice: []int{2, 4, 16},
+			},
+			prompts: []string{
+				"Slice? (y/n): y",
+				"Slice [0] (2): 0",
+				"More Slice? (y/n): y",
+				"Slice [1] (4): 1",
+				"More Slice? (y/n): y",
+				"Slice [2] (16): 2",
+				"More Slice? (y/n): y",
+				"Slice: 3",
+				"More Slice? (y/n): n",
+			},
+			expected: RepromptSliceCommand{
+				Slice: []int{0, 1, 2, 3},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		ctx := NewContext()
+		ctx.ArgPrefix = "-"
+		ctx.RepromptSliceElements = true
+		ctx.ForcePrompt = true
+		ctx.Prompt = func(prompt string, prop Property) (string, error) {
+			if len(test.prompts) == 0 {
+				return "", fmt.Errorf("No input left for prompt '%s'", prompt)
+			}
+			line := test.prompts[0]
+			test.prompts = test.prompts[1:]
+			if strings.HasPrefix(line, prompt) {
+				return line[len(prompt):], nil
+			} else {
+				return "", fmt.Errorf("Prompted '%s', got '%s'", prompt, line)
+			}
+		}
+
+		err := Unmarshal(ctx, &test.input)
+		if err != nil {
+			t.Errorf("Test [%s] failed with error %v", test.name, err)
+		} else if !equalsJson(test.input, test.expected) {
+			t.Errorf("Test [%s] failed, expected %+v got %+v", test.name, toJson(test.expected), toJson(test.input))
 		}
 	}
 }

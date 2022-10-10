@@ -31,6 +31,8 @@ type Property struct {
 	PromptEnd string
 	// The text to display when questioning for more. ex: `prompt-options:"more:More?"`
 	PromptMore string
+	// If the property should reprompt given slice and map values. ex `prompt-options="reprompt"`
+	Reprompt bool
 	// Help text to display for this property if requested by the user. ex: `help:"your help text here"`
 	Help string
 	// If the default value should be shown to the user. ex: `default-mode:"hide"`
@@ -247,20 +249,70 @@ func (prop *Property) fromArgsSlice(ctx *Context) error {
 
 	elementType := sliceType.Elem()
 	argPrefix := ctx.ArgPrefix
+	promptContext := ctx.PromptContext
 	defer func() {
 		ctx.ArgPrefix = argPrefix
+		ctx.PromptContext = promptContext
 	}()
 
 	length := slice.Len()
 
 	elementTemplate := prop.getArgTemplate(argPrefix, concreteType(elementType).Kind(), ctx.ArgSliceTemplate)
 
-	for {
-		elementTemplate.Index = length + ctx.StartIndex
+	additionalValues := true
+
+	if (ctx.RepromptSliceElements || prop.Reprompt) && ctx.CanPrompt() {
+		ctx.PromptContext.Reprompt = true
+
+		for i := 0; i < length && additionalValues; i++ {
+			elementTemplate.Index = i + ctx.ArgStartIndex
+			elementPrefix, err := elementTemplate.get()
+			if err != nil {
+				return err
+			}
+
+			ctx.PromptContext.forSlice(i)
+
+			loaded, err := captureValue(ctx, *prop, slice.Index(i), elementPrefix)
+			keep := err != Discard
+			if err != nil && keep {
+				return err
+			}
+
+			if keep {
+				if loaded.IsEmpty() && (prop.Min == nil || length+1 >= int(*prop.Min)) && !ctx.CanPrompt() {
+					break
+				}
+
+				prop.Flags.Set(loaded.value)
+
+				if prop.Max != nil && length >= int(*prop.Max) {
+					break
+				}
+			}
+
+			if prop.Min == nil || length >= int(*prop.Min) {
+				more, err := prop.promptMore(ctx)
+				if err != nil {
+					return err
+				}
+				if !more {
+					additionalValues = false
+				}
+			}
+		}
+
+		ctx.PromptContext.Reprompt = false
+	}
+
+	for additionalValues {
+		elementTemplate.Index = length + ctx.ArgStartIndex
 		elementPrefix, err := elementTemplate.get()
 		if err != nil {
 			return err
 		}
+
+		ctx.PromptContext.forSlice(length)
 
 		element, loaded, err := captureType(ctx, *prop, elementType, elementPrefix)
 		keep := err != Discard
@@ -288,7 +340,7 @@ func (prop *Property) fromArgsSlice(ctx *Context) error {
 				return err
 			}
 			if !more {
-				break
+				additionalValues = false
 			}
 		}
 	}
@@ -328,7 +380,7 @@ func (prop *Property) fromArgsArray(ctx *Context) error {
 	elementTemplate := prop.getArgTemplate(argPrefix, concreteType(arrayType.Elem()).Kind(), ctx.ArgArrayTemplate)
 
 	for i := 0; i < arrayType.Len(); i++ {
-		elementTemplate.Index = i + ctx.StartIndex
+		elementTemplate.Index = i + ctx.ArgStartIndex
 
 		element := initialize(array.Index(i))
 		elementPrefix, err := elementTemplate.get()
@@ -374,8 +426,10 @@ func (prop *Property) fromArgsMap(ctx *Context) error {
 	mp := concreteValue(value)
 
 	argPrefix := ctx.ArgPrefix
+	promptContext := ctx.PromptContext
 	defer func() {
 		ctx.ArgPrefix = argPrefix
+		ctx.PromptContext = promptContext
 	}()
 
 	argFlags := Flags[PropertyFlags]{}
@@ -384,14 +438,59 @@ func (prop *Property) fromArgsMap(ctx *Context) error {
 	keyTemplate := prop.getArgTemplate(argPrefix, concreteType(keyType).Kind(), ctx.ArgMapKeyTemplate)
 	valueTemplate := prop.getArgTemplate(argPrefix, concreteType(valueType).Kind(), ctx.ArgMapValueTemplate)
 
-	for {
-		keyTemplate.Index = length + ctx.StartIndex
-		valueTemplate.Index = length + ctx.StartIndex
+	additionalValues := true
+
+	if (ctx.RepromptMapValues || prop.Reprompt) && ctx.CanPrompt() {
+		ctx.PromptContext.Reprompt = true
+
+		itr := mp.MapRange()
+		for itr.Next() {
+			mapKey := itr.Key()
+			mapValue := pointerOf(itr.Value()).Elem()
+
+			ctx.PromptContext.forMapValue(mapKey.Interface())
+
+			valueLoaded, err := captureValue(ctx, *prop, mapValue, "")
+			valueKeep := err != Discard
+			if err != nil && valueKeep {
+				return err
+			}
+
+			if valueKeep {
+				mp.SetMapIndex(mapKey, mapValue)
+				argFlags.Set(valueLoaded.value)
+				length = mp.Len()
+
+				if prop.Max != nil && length >= int(*prop.Max) {
+					break
+				}
+
+				if prop.Min == nil || length >= int(*prop.Min) {
+					more, err := prop.promptMore(ctx)
+					if err != nil {
+						return err
+					}
+					if !more {
+						additionalValues = false
+						break
+					}
+				}
+			}
+		}
+
+		ctx.PromptContext.Reprompt = false
+	}
+
+	for additionalValues {
+		keyTemplate.Index = length + ctx.ArgStartIndex
+		valueTemplate.Index = length + ctx.ArgStartIndex
 
 		keyPrefix, err := keyTemplate.get()
 		if err != nil {
 			return err
 		}
+
+		ctx.PromptContext.forMapKey()
 
 		key, keyLoaded, err := captureType(ctx, *prop, keyType, keyPrefix)
 		keyKeep := err != Discard
@@ -408,6 +507,8 @@ func (prop *Property) fromArgsMap(ctx *Context) error {
 			if err != nil {
 				return err
 			}
+
+			ctx.PromptContext.forMapValue(key.Interface())
 
 			value, valueLoaded, err := captureType(ctx, *prop, valueType, valuePrefix)
 			valueKeep := err != Discard
@@ -432,7 +533,7 @@ func (prop *Property) fromArgsMap(ctx *Context) error {
 				return err
 			}
 			if !more {
-				break
+				additionalValues = false
 			}
 		}
 	}
@@ -539,6 +640,7 @@ type promptTemplate struct {
 	HideDefault  bool
 	PromptCount  int
 	AfterHelp    bool
+	Context      PromptContext
 
 	template *template.Template
 }
@@ -551,7 +653,7 @@ func (tpl promptTemplate) get() (string, error) {
 	return out.String(), nil
 }
 
-func (prop Property) getPromptTemplate(tpl *template.Template) promptTemplate {
+func (prop Property) getPromptTemplate(promptContext PromptContext, tpl *template.Template) promptTemplate {
 	currentValue := prop.Value.Interface()
 	isDefault := isDefaultValue(currentValue)
 	currentText := fmt.Sprintf("%+v", currentValue)
@@ -566,13 +668,14 @@ func (prop Property) getPromptTemplate(tpl *template.Template) promptTemplate {
 		CurrentText:  currentText,
 		PromptCount:  0,
 		AfterHelp:    false,
+		Context:      promptContext,
 
 		template: tpl,
 	}
 }
 
 func (prop *Property) promptSimple(ctx *Context) error {
-	promptTemplate := prop.getPromptTemplate(ctx.PromptTemplate)
+	promptTemplate := prop.getPromptTemplate(ctx.PromptContext, ctx.PromptTemplate)
 
 	for i := 0; i <= ctx.RepromptOnInvalid; i++ {
 		promptTemplate.PromptCount = i
@@ -815,6 +918,8 @@ func getStructProperty(field reflect.StructField, value reflect.Value) Property 
 			switch key {
 			case "multi":
 				prop.PromptMulti = true
+			case "reprompt":
+				prop.Reprompt = true
 			case "start":
 				prop.PromptStart = value
 			case "end":

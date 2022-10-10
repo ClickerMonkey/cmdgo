@@ -15,35 +15,50 @@ var Discard = errors.New("DISCARD")
 
 // A dynamic set of variables that commands can have access to during capture and execution.
 type Context struct {
+	Values map[string]any
+
 	Args                []string
-	Prompt              func(prompt string, prop Property) (string, error)
-	PromptStart         func(prop Property) (bool, error)
-	PromptStartOptions  map[string]bool
-	PromptStartSuffix   string
-	PromptMore          func(prop Property) (bool, error)
-	PromptMoreOptions   map[string]bool
-	PromptMoreSuffix    string
-	PromptEnd           func(prop Property) error
-	Values              map[string]any
-	HelpPrompt          string
-	QuitPrompt          string
-	DiscardPrompt       string
-	DisablePrompt       bool
-	ForcePrompt         bool
-	DisplayHelp         func(prop Property)
 	ArgPrefix           string
-	StartIndex          int
-	RepromptOnInvalid   int
-	PromptTemplate      *template.Template
+	ArgStartIndex       int
 	ArgStructTemplate   *template.Template
 	ArgSliceTemplate    *template.Template
 	ArgArrayTemplate    *template.Template
 	ArgMapKeyTemplate   *template.Template
 	ArgMapValueTemplate *template.Template
 
+	HelpPrompt            string
+	QuitPrompt            string
+	DiscardPrompt         string
+	DisablePrompt         bool
+	ForcePrompt           bool
+	Prompt                func(prompt string, prop Property) (string, error)
+	PromptStart           func(prop Property) (bool, error)
+	PromptStartOptions    map[string]bool
+	PromptStartSuffix     string
+	PromptMore            func(prop Property) (bool, error)
+	PromptMoreOptions     map[string]bool
+	PromptMoreSuffix      string
+	PromptEnd             func(prop Property) error
+	PromptTemplate        *template.Template
+	PromptContext         PromptContext
+	RepromptSliceElements bool
+	RepromptMapValues     bool
+	RepromptOnInvalid     int
+
+	DisplayHelp func(prop Property)
+
 	in       *os.File
 	inReader *bufio.Reader
 	out      *os.File
+}
+
+type PromptContext struct {
+	IsMapKey   bool
+	IsMapValue bool
+	IsSlice    bool
+	MapKey     string
+	SliceIndex int
+	Reprompt   bool
 }
 
 func (ctx *Context) WithArgs(args []string) *Context {
@@ -115,26 +130,34 @@ func NewContext() *Context {
 	var ctx *Context
 
 	ctx = &Context{
+		Values: make(map[string]any),
+
 		Args:                make([]string, 0),
-		Values:              make(map[string]any),
-		HelpPrompt:          "help!",
-		QuitPrompt:          "quit!",
-		DiscardPrompt:       "discard!",
-		StartIndex:          1,
-		RepromptOnInvalid:   5,
-		DisablePrompt:       false,
-		ForcePrompt:         false,
 		ArgPrefix:           "--",
-		PromptStartOptions:  promptOptions,
-		PromptStartSuffix:   " (y/n): ",
-		PromptMoreOptions:   promptOptions,
-		PromptMoreSuffix:    " (y/n): ",
-		PromptTemplate:      newTemplate("{{ .PromptText }}{{ if .DefaultText }} ({{ .DefaultText }}){{ else if and (not .IsDefault) (not .HideDefault)  }} ({{ .CurrentText }}){{ end }}: "),
+		ArgStartIndex:       1,
 		ArgStructTemplate:   newTemplate("{{ .Prefix }}{{ .Arg }}-"),
 		ArgSliceTemplate:    newTemplate("{{ .Prefix }}{{ .Arg }}{{ if not .IsSimple }}-{{ .Index }}-{{ end }}"),
 		ArgArrayTemplate:    newTemplate("{{ .Prefix }}{{ .Arg }}-{{ .Index }}{{ if not .IsSimple }}-{{ end }}"),
 		ArgMapKeyTemplate:   newTemplate("{{ .Prefix }}{{ .Arg }}-key{{ if not .IsSimple }}-{{ end }}"),
 		ArgMapValueTemplate: newTemplate("{{ .Prefix }}{{ .Arg }}-value{{ if not .IsSimple }}-{{ end }}"),
+
+		HelpPrompt:         "help!",
+		QuitPrompt:         "quit!",
+		DiscardPrompt:      "discard!",
+		DisablePrompt:      false,
+		ForcePrompt:        false,
+		PromptStartOptions: promptOptions,
+		PromptStartSuffix:  " (y/n): ",
+		PromptMoreOptions:  promptOptions,
+		PromptMoreSuffix:   " (y/n): ",
+		PromptTemplate: newTemplate(`
+			{{- .PromptText -}}
+			{{- if .Context.IsMapValue }} [{{ .Context.MapKey }}]{{ end }}
+			{{- if .Context.IsMapKey }} key{{ end }}
+			{{- if and .Context.IsSlice .Context.Reprompt }} [{{ .Context.SliceIndex }}]{{ end }}
+			{{- if .DefaultText }} ({{ .DefaultText }})
+			{{- else if and (not .IsDefault) (not .HideDefault) }} ({{ .CurrentText }})
+			{{- end }}: `),
 		PromptStart: func(prop Property) (bool, error) {
 			if !ctx.CanPrompt() {
 				return true, nil
@@ -194,6 +217,10 @@ func NewContext() *Context {
 			}
 			return input, nil
 		},
+		RepromptOnInvalid:     5,
+		RepromptSliceElements: false,
+		RepromptMapValues:     false,
+
 		DisplayHelp: func(prop Property) {
 			ctx.printf("%s\n", prop.Help)
 		},
@@ -208,4 +235,29 @@ func newTemplate(pattern string) *template.Template {
 		panic(err)
 	}
 	return tpl
+}
+
+func (pc *PromptContext) reset() {
+	pc.IsMapKey = false
+	pc.MapKey = ""
+	pc.IsMapValue = false
+	pc.SliceIndex = -1
+	pc.IsSlice = false
+}
+
+func (pc *PromptContext) forMapKey() {
+	pc.reset()
+	pc.IsMapKey = true
+}
+
+func (pc *PromptContext) forMapValue(key any) {
+	pc.reset()
+	pc.MapKey = fmt.Sprintf("%+v", key)
+	pc.IsMapValue = true
+}
+
+func (pc *PromptContext) forSlice(index int) {
+	pc.reset()
+	pc.IsSlice = true
+	pc.SliceIndex = index
 }

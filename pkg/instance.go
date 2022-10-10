@@ -63,11 +63,9 @@ func (inst *Instance) Capture(ctx *Context) error {
 			return err
 		}
 
-		if ctx.Prompt != nil {
-			err = property.Prompt(ctx)
-			if err != nil {
-				return err
-			}
+		err = property.Prompt(ctx)
+		if err != nil {
+			return err
 		}
 
 		err = property.Validate()
