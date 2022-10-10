@@ -63,14 +63,15 @@ func TestSimple(t *testing.T) {
 	for _, test := range tests {
 		actualHelps := []string{}
 
-		ctx := NewContextQuiet(append([]string{"simple"}, test.args...))
+		ctx := NewContext().WithArgs(append([]string{"simple"}, test.args...))
 		ctx.ArgPrefix = "-"
+		ctx.ForcePrompt = true
 		ctx.Prompt = func(prompt string, prop Property) (string, error) {
 			input := test.prompts[prompt]
 			if input == ctx.QuitPrompt {
 				return input, Quit
 			}
-			return test.prompts[prompt], nil
+			return input, nil
 		}
 		ctx.DisplayHelp = func(prop Property) {
 			actualHelps = append(actualHelps, prop.Help)
@@ -79,20 +80,20 @@ func TestSimple(t *testing.T) {
 		err := Execute(ctx)
 		if err != nil {
 			if test.errorText == "" {
-				t.Fatal(err)
+				t.Error(err)
 			} else if test.errorText != err.Error() {
-				t.Fatalf("Expected error %s but got %s", test.errorText, err.Error())
+				t.Errorf("Expected error %s but got %s", test.errorText, err.Error())
 			}
 		} else if ctx.Values["result"] != test.result {
-			t.Fatalf("Expected result %s but got %s", test.result, ctx.Values["result"])
+			t.Errorf("Expected result %s but got %s", test.result, ctx.Values["result"])
 		}
 		if test.helps != nil && len(test.helps) > 0 {
 			if len(test.helps) != len(actualHelps) {
-				t.Fatalf("Mismatch in expected helps %d but got %d", len(test.helps), len(actualHelps))
+				t.Errorf("Mismatch in expected helps %d but got %d", len(test.helps), len(actualHelps))
 			} else {
 				for i := range actualHelps {
 					if actualHelps[i] != test.helps[i] {
-						t.Fatalf("Expected help %s but got %s", test.helps[i], actualHelps[i])
+						t.Errorf("Expected help %s but got %s", test.helps[i], actualHelps[i])
 					}
 				}
 			}
@@ -224,7 +225,7 @@ func TestVaried(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		ctx := NewContextQuiet(append([]string{"varied"}, test.args...))
+		ctx := NewContext().WithArgs(append([]string{"varied"}, test.args...))
 		ctx.ArgPrefix = "-"
 
 		captured, err := Capture(ctx)

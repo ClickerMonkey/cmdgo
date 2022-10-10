@@ -60,11 +60,10 @@ func Capture(ctx *Context) (any, error) {
 		}
 	}
 
-	prompter := ctx.Prompt
-	if prompter != nil && !interactive {
-		ctx.Prompt = nil
+	if !interactive {
+		ctx.DisablePrompt = true
 		defer func() {
-			ctx.Prompt = prompter
+			ctx.DisablePrompt = false
 		}()
 	}
 

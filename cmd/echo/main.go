@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"os"
 
 	cmdgo "github.com/ClickerMonkey/cmdgo/pkg"
 )
@@ -21,7 +20,7 @@ func (echo *Echo) Execute(ctx *cmdgo.Context) error {
 func main() {
 	cmdgo.Register("echo", Echo{})
 
-	ctx := cmdgo.NewContext(os.Args[1:])
+	ctx := cmdgo.NewContext().Program()
 	err := cmdgo.Execute(ctx)
 	if err != nil {
 		panic(err)

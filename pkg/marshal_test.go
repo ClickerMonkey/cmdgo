@@ -11,7 +11,7 @@ func TestUnmarshall(t *testing.T) {
 	}{
 		{
 			name:    "simple",
-			context: NewContextQuiet([]string{"--message", "Hi"}),
+			context: NewContext().WithArgs([]string{"--message", "Hi"}),
 			expected: struct {
 				Message string
 			}{

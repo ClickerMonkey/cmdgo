@@ -11,6 +11,7 @@ import (
 )
 
 var Quit = errors.New("QUIT")
+var Discard = errors.New("DISCARD")
 
 // A dynamic set of variables that commands can have access to during capture and execution.
 type Context struct {
@@ -26,6 +27,9 @@ type Context struct {
 	Values              map[string]any
 	HelpPrompt          string
 	QuitPrompt          string
+	DiscardPrompt       string
+	DisablePrompt       bool
+	ForcePrompt         bool
 	DisplayHelp         func(prop Property)
 	ArgPrefix           string
 	StartIndex          int
@@ -34,83 +38,63 @@ type Context struct {
 	ArgArrayTemplate    *template.Template
 	ArgMapKeyTemplate   *template.Template
 	ArgMapValueTemplate *template.Template
+
+	in       *os.File
+	inReader *bufio.Reader
+	out      *os.File
 }
 
-// A new context which uses std in & out for prompting
-func NewContext(args []string) *Context {
-	return NewContextFiles(args, os.Stdin, os.Stdout)
-}
-
-// A new context which uses the given files for prompting
-func NewContextFiles(args []string, in *os.File, out *os.File) *Context {
-	ctx := NewContextQuiet(args)
-
-	reader := bufio.NewReader(os.Stdin)
-
-	ctx.PromptStart = func(prop Property) (bool, error) {
-		for {
-			input, err := ctx.Prompt(prop.PromptStart+ctx.PromptStartSuffix, prop)
-			if err != nil {
-				return false, err
-			}
-			if answer, ok := ctx.PromptStartOptions[strings.ToLower(input)]; ok {
-				return answer, nil
-			}
-		}
-	}
-
-	ctx.PromptMore = func(prop Property) (bool, error) {
-		for {
-			input, err := ctx.Prompt(prop.PromptMore+ctx.PromptMoreSuffix, prop)
-			if err != nil {
-				return false, err
-			}
-			if answer, ok := ctx.PromptMoreOptions[strings.ToLower(input)]; ok {
-				return answer, nil
-			}
-		}
-	}
-
-	ctx.PromptEnd = func(prop Property) error {
-		_, err := fmt.Fprintf(out, "%s\n", prop.PromptEnd)
-		return err
-	}
-
-	ctx.Prompt = func(prompt string, prop Property) (string, error) {
-		_, err := fmt.Fprintf(out, prompt)
-		if err != nil {
-			return "", err
-		}
-		input := ""
-		for {
-			line, err := reader.ReadString('\n')
-			if err != nil && err != io.EOF {
-				return "", err
-			}
-			input += line
-			if !prop.PromptMulti || line == "" || err != nil {
-				break
-			}
-		}
-		input = strings.TrimRight(input, "\n")
-		if strings.EqualFold(input, ctx.QuitPrompt) {
-			return input, Quit
-		}
-		return input, nil
-	}
-
-	ctx.DisplayHelp = func(prop Property) {
-		fmt.Fprintf(out, prop.Help)
-	}
-
+func (ctx *Context) WithArgs(args []string) *Context {
+	ctx.Args = make([]string, len(args))
+	copy(ctx.Args, args)
 	return ctx
 }
 
-// A new context which does not support prompting.
-func NewContextQuiet(args []string) *Context {
-	argsCopy := make([]string, len(args))
-	copy(argsCopy, args)
+func (ctx *Context) ClearArgs(args []string) *Context {
+	ctx.Args = []string{}
+	return ctx
+}
 
+func (ctx *Context) WithFiles(in *os.File, out *os.File) *Context {
+	ctx.in = in
+	ctx.out = out
+	ctx.inReader = bufio.NewReader(in)
+	return ctx
+}
+
+func (ctx *Context) ClearFiles(args []string) *Context {
+	ctx.in = nil
+	ctx.out = nil
+	ctx.inReader = nil
+	return ctx
+}
+
+func (ctx *Context) Std() *Context {
+	return ctx.WithFiles(os.Stdin, os.Stdout)
+}
+
+func (ctx *Context) Cli() *Context {
+	return ctx.WithArgs(os.Args[1:])
+}
+
+func (ctx *Context) Program() *Context {
+	return ctx.Std().Cli()
+}
+
+func (ctx *Context) printf(format string, args ...any) error {
+	if ctx.out == nil {
+		return nil
+	}
+	_, err := fmt.Fprintf(ctx.out, format, args...)
+	return err
+}
+
+func (ctx *Context) CanPrompt() bool {
+	return ctx.ForcePrompt || (ctx.in != nil && !ctx.DisablePrompt)
+}
+
+// A new context which by default has no arguments and does not support prompting.
+func NewContext() *Context {
 	promptOptions := map[string]bool{
 		"y":     true,
 		"yes":   true,
@@ -126,12 +110,16 @@ func NewContextQuiet(args []string) *Context {
 		"false": false,
 	}
 
-	return &Context{
-		Args:                argsCopy,
+	var ctx *Context
+
+	ctx = &Context{
+		Args:                make([]string, 0),
 		Values:              make(map[string]any),
 		HelpPrompt:          "help!",
 		QuitPrompt:          "quit!",
 		StartIndex:          1,
+		DisablePrompt:       false,
+		ForcePrompt:         false,
 		ArgPrefix:           "--",
 		PromptStartOptions:  promptOptions,
 		PromptStartSuffix:   " (y/n): ",
@@ -142,7 +130,71 @@ func NewContextQuiet(args []string) *Context {
 		ArgArrayTemplate:    newTemplate("{{ .Prefix }}{{ .Arg }}-{{ .Index }}{{ if not .IsSimple }}-{{ end }}"),
 		ArgMapKeyTemplate:   newTemplate("{{ .Prefix }}{{ .Arg }}-key{{ if not .IsSimple }}-{{ end }}"),
 		ArgMapValueTemplate: newTemplate("{{ .Prefix }}{{ .Arg }}-value{{ if not .IsSimple }}-{{ end }}"),
+		PromptStart: func(prop Property) (bool, error) {
+			if !ctx.CanPrompt() {
+				return true, nil
+			}
+			for {
+				input, err := ctx.Prompt(prop.PromptStart+ctx.PromptStartSuffix, prop)
+				if err != nil {
+					return false, err
+				}
+				if answer, ok := ctx.PromptStartOptions[strings.ToLower(input)]; ok {
+					return answer, nil
+				}
+			}
+		},
+		PromptMore: func(prop Property) (bool, error) {
+			if !ctx.CanPrompt() {
+				return true, nil
+			}
+			for {
+				input, err := ctx.Prompt(prop.PromptMore+ctx.PromptMoreSuffix, prop)
+				if err != nil {
+					return false, err
+				}
+				if answer, ok := ctx.PromptMoreOptions[strings.ToLower(input)]; ok {
+					return answer, nil
+				}
+			}
+		},
+		PromptEnd: func(prop Property) error {
+			if !ctx.CanPrompt() {
+				return nil
+			}
+			return ctx.printf("%s\n", prop.PromptEnd)
+		},
+		Prompt: func(prompt string, prop Property) (string, error) {
+			err := ctx.printf(prompt)
+			if err != nil {
+				return "", err
+			}
+			input := ""
+			for {
+				line, err := ctx.inReader.ReadString('\n')
+				if err != nil && err != io.EOF {
+					return "", err
+				}
+				input += line
+				if !prop.PromptMulti || line == "" || err != nil {
+					break
+				}
+			}
+			input = strings.TrimRight(input, "\n")
+			if strings.EqualFold(input, ctx.QuitPrompt) {
+				return input, Quit
+			}
+			if strings.EqualFold(input, ctx.DiscardPrompt) {
+				return input, Discard
+			}
+			return input, nil
+		},
+		DisplayHelp: func(prop Property) {
+			ctx.printf(prop.Help)
+		},
 	}
+
+	return ctx
 }
 
 func newTemplate(pattern string) *template.Template {
