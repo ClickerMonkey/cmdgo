@@ -117,6 +117,7 @@ func NewContext() *Context {
 		Values:              make(map[string]any),
 		HelpPrompt:          "help!",
 		QuitPrompt:          "quit!",
+		DiscardPrompt:       "discard!",
 		StartIndex:          1,
 		DisablePrompt:       false,
 		ForcePrompt:         false,
@@ -181,10 +182,10 @@ func NewContext() *Context {
 				}
 			}
 			input = strings.TrimRight(input, "\n")
-			if strings.EqualFold(input, ctx.QuitPrompt) {
+			if ctx.QuitPrompt != "" && strings.EqualFold(input, ctx.QuitPrompt) {
 				return input, Quit
 			}
-			if strings.EqualFold(input, ctx.DiscardPrompt) {
+			if ctx.DiscardPrompt != "" && strings.EqualFold(input, ctx.DiscardPrompt) {
 				return input, Discard
 			}
 			return input, nil

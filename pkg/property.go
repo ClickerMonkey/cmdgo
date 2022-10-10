@@ -257,20 +257,23 @@ func (prop *Property) fromArgsSlice(ctx *Context) error {
 		}
 
 		element, loaded, err := captureType(ctx, *prop, elementType, elementPrefix)
-		if err != nil {
+		keep := err != Discard
+		if err != nil && keep {
 			return err
 		}
 
-		if loaded.IsEmpty() && (prop.Min == nil || length+1 >= int(*prop.Min)) && !ctx.CanPrompt() {
-			break
-		}
+		if keep {
+			if loaded.IsEmpty() && (prop.Min == nil || length+1 >= int(*prop.Min)) && !ctx.CanPrompt() {
+				break
+			}
 
-		prop.Flags.Set(loaded.value)
-		slice = reflect.Append(slice, element)
-		length = slice.Len()
+			prop.Flags.Set(loaded.value)
+			slice = reflect.Append(slice, element)
+			length = slice.Len()
 
-		if prop.Max != nil && length >= int(*prop.Max) {
-			break
+			if prop.Max != nil && length >= int(*prop.Max) {
+				break
+			}
 		}
 
 		if prop.Min == nil || length >= int(*prop.Min) {
@@ -385,30 +388,36 @@ func (prop *Property) fromArgsMap(ctx *Context) error {
 		}
 
 		key, keyLoaded, err := captureType(ctx, *prop, keyType, keyPrefix)
-		if err != nil {
+		keyKeep := err != Discard
+		if err != nil && keyKeep {
 			return err
 		}
 
-		if keyLoaded.IsEmpty() && (prop.Min == nil || length+1 >= int(*prop.Min)) && !ctx.CanPrompt() {
-			break
-		}
+		if keyKeep {
+			if keyLoaded.IsEmpty() && (prop.Min == nil || length+1 >= int(*prop.Min)) && !ctx.CanPrompt() {
+				break
+			}
 
-		valuePrefix, err := valueTemplate.get()
-		if err != nil {
-			return err
-		}
+			valuePrefix, err := valueTemplate.get()
+			if err != nil {
+				return err
+			}
 
-		value, valueLoaded, err := captureType(ctx, *prop, valueType, valuePrefix)
-		if err != nil {
-			return err
-		}
+			value, valueLoaded, err := captureType(ctx, *prop, valueType, valuePrefix)
+			valueKeep := err != Discard
+			if err != nil && valueKeep {
+				return err
+			}
 
-		argFlags.Set(keyLoaded.value | valueLoaded.value)
-		mp.SetMapIndex(key, value)
-		length = mp.Len()
+			if valueKeep {
+				argFlags.Set(keyLoaded.value | valueLoaded.value)
+				mp.SetMapIndex(key, value)
+				length = mp.Len()
 
-		if prop.Max != nil && length >= int(*prop.Max) {
-			break
+				if prop.Max != nil && length >= int(*prop.Max) {
+					break
+				}
+			}
 		}
 
 		if prop.Min == nil || length >= int(*prop.Min) {
