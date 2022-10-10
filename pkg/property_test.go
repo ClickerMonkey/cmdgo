@@ -7,6 +7,7 @@ func TestConvert(t *testing.T) {
 		options  map[string]string
 		text     string
 		expected string
+		invalid  bool
 	}{
 		{
 			options: map[string]string{
@@ -32,8 +33,8 @@ func TestConvert(t *testing.T) {
 				"blue":   "2",
 				"banana": "3",
 			},
-			text:     "b",
-			expected: "b",
+			text:    "b",
+			invalid: true,
 		},
 		{
 			options: map[string]string{
@@ -51,9 +52,11 @@ func TestConvert(t *testing.T) {
 			Options: test.options,
 		}
 
-		converted := prop.Convert(test.text)
+		converted, err := prop.Convert(test.text)
 		if converted != test.expected {
 			t.Errorf("Converted %s does not match expected %s", converted, test.expected)
+		} else if (err != nil) != test.invalid {
+			t.Errorf("Expected error %v but got %v", test.invalid, err)
 		}
 	}
 }

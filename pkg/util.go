@@ -1,6 +1,7 @@
 package cmdgo
 
 import (
+	"errors"
 	"fmt"
 	"reflect"
 	"regexp"
@@ -54,6 +55,8 @@ func GetArg(name string, defaultValue string, args *[]string, argPrefix string, 
 	return value
 }
 
+var InvalidFormat = errors.New("Invalid format.")
+
 func SetString(value reflect.Value, s string) error {
 	if value.Kind() == reflect.Pointer {
 		concrete := value.Elem()
@@ -86,14 +89,19 @@ func SetString(value reflect.Value, s string) error {
 		value.SetUint(cast)
 	} else if cast, ok := parsed.(string); ok {
 		value.SetString(cast)
+	} else {
+		switch value.Kind() {
+		case reflect.Slice, reflect.Array, reflect.Pointer:
+			value.Set(reflect.ValueOf(parsed))
+		default:
+			return InvalidFormat
+		}
 	}
 
-	switch value.Kind() {
-	case reflect.Slice, reflect.Array, reflect.Pointer:
-		value.Set(reflect.ValueOf(parsed))
-	}
 	return nil
 }
+
+var UnsupportedType = errors.New("Unsupported type.")
 
 func ParseType(t reflect.Type, s string) (any, error) {
 	switch t.Kind() {
@@ -163,7 +171,8 @@ func ParseType(t reflect.Type, s string) (any, error) {
 		}
 		return slice.Interface(), nil
 	}
-	return nil, nil
+
+	return nil, UnsupportedType
 }
 
 func concreteValue(value reflect.Value) reflect.Value {

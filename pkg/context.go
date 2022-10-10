@@ -33,6 +33,7 @@ type Context struct {
 	DisplayHelp         func(prop Property)
 	ArgPrefix           string
 	StartIndex          int
+	RepromptOnInvalid   int
 	ArgStructTemplate   *template.Template
 	ArgSliceTemplate    *template.Template
 	ArgArrayTemplate    *template.Template
@@ -119,6 +120,7 @@ func NewContext() *Context {
 		QuitPrompt:          "quit!",
 		DiscardPrompt:       "discard!",
 		StartIndex:          1,
+		RepromptOnInvalid:   5,
 		DisablePrompt:       false,
 		ForcePrompt:         false,
 		ArgPrefix:           "--",

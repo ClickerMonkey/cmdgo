@@ -2,6 +2,7 @@ package cmdgo
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"os"
 	"reflect"
@@ -62,11 +63,13 @@ const (
 	PropertyFlagDefault
 )
 
-func (prop Property) Convert(text string) string {
+var InvalidConversion = errors.New("Invalid conversion.")
+
+func (prop Property) Convert(text string) (string, error) {
 	if prop.Options != nil && len(prop.Options) > 0 {
 		key := Normalize(text)
 		if converted, ok := prop.Options[key]; ok {
-			return converted
+			return converted, nil
 		}
 		if len(key) > 0 {
 			possible := []string{}
@@ -76,11 +79,14 @@ func (prop Property) Convert(text string) string {
 				}
 			}
 			if len(possible) == 1 {
-				return possible[0]
+				return possible[0], nil
 			}
 		}
+
+		return "", InvalidConversion
 	}
-	return text
+
+	return text, nil
 }
 
 // Returns whether this property can have its state loaded from environment variables
@@ -526,41 +532,50 @@ func (prop *Property) promptSimple(ctx *Context) error {
 	currentValue := prop.Value.Interface()
 	isDefault := isDefaultValue(currentValue)
 
-	promptLabel := prop.PromptText
-	if prop.DefaultText != "" {
-		promptLabel = fmt.Sprintf("%s (%s)", promptLabel, prop.DefaultText)
-	} else if !isDefault && !prop.HideDefault {
-		promptLabel = fmt.Sprintf("%s (%+v)", promptLabel, currentValue)
-	}
+	for i := 0; i <= ctx.RepromptOnInvalid; i++ {
+		promptLabel := prop.PromptText
+		if prop.DefaultText != "" {
+			promptLabel = fmt.Sprintf("%s (%s)", promptLabel, prop.DefaultText)
+		} else if !isDefault && !prop.HideDefault {
+			promptLabel = fmt.Sprintf("%s (%+v)", promptLabel, currentValue)
+		}
 
-	userInput, err := ctx.Prompt(promptLabel+": ", *prop)
-	if err != nil {
-		return err
-	}
-
-	if userInput == ctx.HelpPrompt && ctx.HelpPrompt != "" && prop.Help != "" && ctx.DisplayHelp != nil {
-		ctx.DisplayHelp(*prop)
-		userInput, err = ctx.Prompt(promptLabel+": ", *prop)
+		userInput, err := ctx.Prompt(promptLabel+": ", *prop)
 		if err != nil {
 			return err
 		}
-	}
 
-	reprompt := userInput == "" && isDefault && !prop.IsOptional()
-	if reprompt {
-		userInput, err = ctx.Prompt(promptLabel+" [required]: ", *prop)
-		if err != nil {
-			return err
+		if userInput == ctx.HelpPrompt && ctx.HelpPrompt != "" && prop.Help != "" && ctx.DisplayHelp != nil {
+			ctx.DisplayHelp(*prop)
+			userInput, err = ctx.Prompt(promptLabel+": ", *prop)
+			if err != nil {
+				return err
+			}
 		}
-		if userInput == "" {
-			return fmt.Errorf("%s is required", prop.Name)
-		}
-	}
 
-	if userInput != "" {
-		err := prop.Set(userInput, PropertyFlagPrompt)
-		if err != nil {
-			return err
+		reprompt := userInput == "" && isDefault && !prop.IsOptional()
+		if reprompt {
+			userInput, err = ctx.Prompt(promptLabel+" [required]: ", *prop)
+			if err != nil {
+				return err
+			}
+			if userInput == "" {
+				return fmt.Errorf("%s is required", prop.Name)
+			}
+		}
+
+		if userInput != "" {
+			err := prop.Set(userInput, PropertyFlagPrompt)
+			if err != nil {
+				if i < ctx.RepromptOnInvalid {
+					continue
+				}
+				return err
+			} else {
+				break
+			}
+		} else {
+			break
 		}
 	}
 
@@ -647,8 +662,11 @@ func (prop Property) Size() float64 {
 }
 
 func (prop *Property) Set(input string, addFlags PropertyFlags) error {
-	converted := prop.Convert(input)
-	err := SetString(prop.Value, converted)
+	converted, err := prop.Convert(input)
+	if err != nil {
+		return err
+	}
+	err = SetString(prop.Value, converted)
 	if err == nil {
 		prop.Flags.Set(addFlags)
 	}
