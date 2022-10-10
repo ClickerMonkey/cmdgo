@@ -50,7 +50,7 @@ func (ctx *Context) WithArgs(args []string) *Context {
 	return ctx
 }
 
-func (ctx *Context) ClearArgs(args []string) *Context {
+func (ctx *Context) ClearArgs() *Context {
 	ctx.Args = []string{}
 	return ctx
 }
@@ -62,7 +62,7 @@ func (ctx *Context) WithFiles(in *os.File, out *os.File) *Context {
 	return ctx
 }
 
-func (ctx *Context) ClearFiles(args []string) *Context {
+func (ctx *Context) ClearFiles() *Context {
 	ctx.in = nil
 	ctx.out = nil
 	ctx.inReader = nil
