@@ -3,6 +3,7 @@ package cmdgo
 import (
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -239,11 +240,183 @@ func TestVaried(t *testing.T) {
 	}
 }
 
+type ArgValueSimple string
+
+func (my *ArgValueSimple) FromArgs(ctx *Context, prop *Property, getArg func(arg string, defaultValue string) string) error {
+	v := getArg("-"+prop.Arg, "")
+	if v != "" {
+		*my = ArgValueSimple(v + v)
+		prop.Flags.Set(PropertyFlagArgs)
+	}
+	return nil
+}
+
+type ArgValueStruct struct {
+	Name string
+	Age  int
+}
+
+func (my *ArgValueStruct) FromArgs(ctx *Context, prop *Property, getArg func(arg string, defaultValue string) string) error {
+	v := getArg("-"+prop.Arg, "")
+	if v != "" {
+		pairs := strings.Split(v, ":")
+		if len(pairs) != 2 {
+			return fmt.Errorf("%v was not in the Name:Age format.", v)
+		}
+		my.Name = pairs[0]
+		age, err := strconv.ParseInt(pairs[1], 10, 32)
+		if err != nil {
+			return err
+		}
+		my.Age = int(age)
+		prop.Flags.Set(PropertyFlagArgs)
+	}
+	return nil
+}
+
+type ArgValueCommand struct {
+	Simple ArgValueSimple
+	Struct ArgValueStruct
+}
+
+func TestArgValue(t *testing.T) {
+	tests := []struct {
+		name     string
+		args     []string
+		expected ArgValueCommand
+	}{
+		{
+			name:     "empty",
+			args:     []string{},
+			expected: ArgValueCommand{},
+		},
+		{
+			name: "simple",
+			args: []string{"-simple", "x"},
+			expected: ArgValueCommand{
+				Simple: ArgValueSimple("xx"),
+			},
+		},
+		{
+			name: "struct",
+			args: []string{"-struct", "Phil:33"},
+			expected: ArgValueCommand{
+				Struct: ArgValueStruct{
+					Name: "Phil",
+					Age:  33,
+				},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		ctx := NewContext().WithArgs(test.args)
+		ctx.ArgPrefix = "-"
+
+		actual := ArgValueCommand{}
+		err := Unmarshal(ctx, &actual)
+
+		if err != nil {
+			t.Errorf("Test [%s] failed with error %v", test.name, err)
+		} else if !equalsJson(actual, test.expected) {
+			t.Errorf("Test [%s] failed, expected %+v got %+v", test.name, toJson(test.expected), toJson(actual))
+		}
+	}
+}
+
+type PromptValueSimple string
+
+func (my *PromptValueSimple) Prompt(ctx *Context, prop *Property) error {
+	v, _ := ctx.Prompt(prop.PromptText+": ", *prop)
+	if v != "" {
+		*my = PromptValueSimple(v + v)
+		prop.Flags.Set(PropertyFlagPrompt)
+	}
+	return nil
+}
+
+type PromptValueStruct struct {
+	Name string
+	Age  int
+}
+
+func (my *PromptValueStruct) Prompt(ctx *Context, prop *Property) error {
+	v, _ := ctx.Prompt(prop.PromptText+": ", *prop)
+	if v != "" {
+		pairs := strings.Split(v, ":")
+		if len(pairs) != 2 {
+			return fmt.Errorf("%v was not in the Name:Age format.", v)
+		}
+		my.Name = pairs[0]
+		age, err := strconv.ParseInt(pairs[1], 10, 32)
+		if err != nil {
+			return err
+		}
+		my.Age = int(age)
+		prop.Flags.Set(PropertyFlagPrompt)
+	}
+	return nil
+}
+
+type PromptValueCommand struct {
+	Simple PromptValueSimple
+	Struct PromptValueStruct
+}
+
+func TestPromptValue(t *testing.T) {
+	tests := []struct {
+		name     string
+		expected PromptValueCommand
+		prompts  []string
+	}{
+		{
+			name: "empty",
+			expected: PromptValueCommand{
+				Simple: "aa",
+				Struct: PromptValueStruct{
+					Name: "Phil",
+					Age:  33,
+				},
+			},
+			prompts: []string{
+				"Simple: a",
+				"Struct: Phil:33",
+			},
+		},
+	}
+
+	for _, test := range tests {
+		ctx := NewContext()
+		ctx.ForcePrompt = true
+		ctx.Prompt = func(prompt string, prop Property) (string, error) {
+			if len(test.prompts) == 0 {
+				return "", fmt.Errorf("No input left for prompt '%s'", prompt)
+			}
+			line := test.prompts[0]
+			test.prompts = test.prompts[1:]
+			if strings.HasPrefix(line, prompt) {
+				return line[len(prompt):], nil
+			} else {
+				return "", fmt.Errorf("Prompted '%s', got '%s'", prompt, line)
+			}
+		}
+
+		actual := PromptValueCommand{}
+		err := Unmarshal(ctx, &actual)
+
+		if err != nil {
+			t.Errorf("Test [%s] failed with error %v", test.name, err)
+		} else if !equalsJson(actual, test.expected) {
+			t.Errorf("Test [%s] failed, expected %+v got %+v", test.name, toJson(test.expected), toJson(actual))
+		}
+	}
+}
+
 type RepromptMapCommand struct {
 	Map map[string]int
 }
 
-func TestRepromptMapValues(t *testing.T) {
+func TestRepromptMap(t *testing.T) {
 	tests := []struct {
 		name     string
 		input    RepromptMapCommand
@@ -317,7 +490,6 @@ func TestRepromptMapValues(t *testing.T) {
 
 	for _, test := range tests {
 		ctx := NewContext()
-		ctx.ArgPrefix = "-"
 		ctx.RepromptMapValues = true
 		ctx.ForcePrompt = true
 		ctx.Prompt = func(prompt string, prop Property) (string, error) {

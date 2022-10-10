@@ -25,3 +25,14 @@ type Dynamic interface {
 type Validator interface {
 	Validate(ctx *Context) error
 }
+
+// A value which has custom prompt handling logic.
+type PromptValue interface {
+	Prompt(ctx *Context, prop *Property) error
+}
+
+// A value which has custom arg handling logic. If this is present, this value
+// and any sub values are not handled with arg or prompt logic.
+type ArgValue interface {
+	FromArgs(ctx *Context, prop *Property, getArg func(arg string, defaultValue string) string) error
+}

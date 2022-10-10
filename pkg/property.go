@@ -131,10 +131,39 @@ func (prop Property) CanFromArgs() bool {
 	return prop.Arg != "-" && !prop.IsIgnored()
 }
 
+func (prop *Property) getArgValue(ctx *Context) ArgValue {
+	candidate := prop.Value
+	if candidate.CanAddr() {
+		candidate = candidate.Addr()
+	}
+	if argValue, ok := candidate.Interface().(ArgValue); ok {
+		return argValue
+	}
+	return nil
+}
+
+func (prop *Property) argValue(ctx *Context) (bool, error) {
+	argValue := prop.getArgValue(ctx)
+	if argValue != nil {
+		return true, argValue.FromArgs(ctx, prop, func(arg string, defaultValue string) string {
+			return GetArg("", defaultValue, &ctx.Args, arg, prop.IsBool())
+		})
+	}
+	return false, nil
+}
+
 // Loads value of the property from args if it can and it exists.
 func (prop *Property) FromArgs(ctx *Context) error {
 	if !prop.CanFromArgs() {
 		return nil
+	}
+
+	if argHandled, err := prop.argValue(ctx); argHandled || err != nil {
+		return err
+	}
+
+	if promptHandled, err := prop.promptValue(ctx); promptHandled || err != nil {
+		return err
 	}
 
 	switch {
@@ -190,6 +219,25 @@ func (prop Property) promptMore(ctx *Context) (bool, error) {
 	}
 
 	return true, nil
+}
+
+func (prop *Property) getPromptValue(ctx *Context) PromptValue {
+	candidate := prop.Value
+	if candidate.CanAddr() {
+		candidate = candidate.Addr()
+	}
+	if promptValue, ok := candidate.Interface().(PromptValue); ok {
+		return promptValue
+	}
+	return nil
+}
+
+func (prop *Property) promptValue(ctx *Context) (bool, error) {
+	promptValue := prop.getPromptValue(ctx)
+	if promptValue != nil {
+		return true, promptValue.Prompt(ctx, prop)
+	}
+	return false, nil
 }
 
 func (prop *Property) fromArgsStruct(ctx *Context) error {
@@ -615,6 +663,10 @@ func (prop Property) CanPrompt() bool {
 // Prompts the user for the value of this property if configured to do so.
 func (prop *Property) Prompt(ctx *Context) error {
 	if !prop.CanPrompt() {
+		return nil
+	}
+
+	if prop.getPromptValue(ctx) != nil {
 		return nil
 	}
 
