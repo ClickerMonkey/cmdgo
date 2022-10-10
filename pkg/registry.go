@@ -64,7 +64,9 @@ func (r Registry) Capture(ctx *Context) (any, error) {
 		return nil, fmt.Errorf("Command not found: %v", name)
 	}
 
-	ctx.Args = ctx.Args[1:]
+	if name != "" {
+		ctx.Args = ctx.Args[1:]
+	}
 
 	interactiveDefault := "false"
 	if len(ctx.Args) == 0 {

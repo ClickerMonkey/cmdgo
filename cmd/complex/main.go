@@ -26,6 +26,7 @@ func (prof *Profile) Execute(ctx *cmdgo.Context) error {
 
 func main() {
 	cmdgo.Register("profile", Profile{})
+	cmdgo.Register("", Profile{})
 
 	ctx := cmdgo.NewContext().Program()
 	err := cmdgo.Execute(ctx)

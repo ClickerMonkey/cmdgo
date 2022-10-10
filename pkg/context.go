@@ -34,6 +34,7 @@ type Context struct {
 	ArgPrefix           string
 	StartIndex          int
 	RepromptOnInvalid   int
+	PromptTemplate      *template.Template
 	ArgStructTemplate   *template.Template
 	ArgSliceTemplate    *template.Template
 	ArgArrayTemplate    *template.Template
@@ -128,6 +129,7 @@ func NewContext() *Context {
 		PromptStartSuffix:   " (y/n): ",
 		PromptMoreOptions:   promptOptions,
 		PromptMoreSuffix:    " (y/n): ",
+		PromptTemplate:      newTemplate("{{ .PromptText }}{{ if .DefaultText }} ({{ .DefaultText }}){{ else if and (not .IsDefault) (not .HideDefault)  }} ({{ .CurrentText }}){{ end }}: "),
 		ArgStructTemplate:   newTemplate("{{ .Prefix }}{{ .Arg }}-"),
 		ArgSliceTemplate:    newTemplate("{{ .Prefix }}{{ .Arg }}{{ if not .IsSimple }}-{{ .Index }}-{{ end }}"),
 		ArgArrayTemplate:    newTemplate("{{ .Prefix }}{{ .Arg }}-{{ .Index }}{{ if not .IsSimple }}-{{ end }}"),
@@ -193,7 +195,7 @@ func NewContext() *Context {
 			return input, nil
 		},
 		DisplayHelp: func(prop Property) {
-			ctx.printf(prop.Help)
+			ctx.printf("%s\n", prop.Help)
 		},
 	}
 

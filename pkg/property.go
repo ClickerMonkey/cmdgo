@@ -206,7 +206,7 @@ func (prop *Property) fromArgsStruct(ctx *Context) error {
 		ctx.ArgPrefix = argPrefix
 	}()
 
-	structTemplate := prop.getTemplateInput(argPrefix, reflect.Struct, ctx.ArgStructTemplate)
+	structTemplate := prop.getArgTemplate(argPrefix, reflect.Struct, ctx.ArgStructTemplate)
 
 	prefix, err := structTemplate.get()
 	if err != nil {
@@ -253,7 +253,7 @@ func (prop *Property) fromArgsSlice(ctx *Context) error {
 
 	length := slice.Len()
 
-	elementTemplate := prop.getTemplateInput(argPrefix, concreteType(elementType).Kind(), ctx.ArgSliceTemplate)
+	elementTemplate := prop.getArgTemplate(argPrefix, concreteType(elementType).Kind(), ctx.ArgSliceTemplate)
 
 	for {
 		elementTemplate.Index = length + ctx.StartIndex
@@ -325,7 +325,7 @@ func (prop *Property) fromArgsArray(ctx *Context) error {
 
 	argFlags := Flags[PropertyFlags]{}
 
-	elementTemplate := prop.getTemplateInput(argPrefix, concreteType(arrayType.Elem()).Kind(), ctx.ArgArrayTemplate)
+	elementTemplate := prop.getArgTemplate(argPrefix, concreteType(arrayType.Elem()).Kind(), ctx.ArgArrayTemplate)
 
 	for i := 0; i < arrayType.Len(); i++ {
 		elementTemplate.Index = i + ctx.StartIndex
@@ -381,8 +381,8 @@ func (prop *Property) fromArgsMap(ctx *Context) error {
 	argFlags := Flags[PropertyFlags]{}
 	length := mp.Len()
 
-	keyTemplate := prop.getTemplateInput(argPrefix, concreteType(keyType).Kind(), ctx.ArgMapKeyTemplate)
-	valueTemplate := prop.getTemplateInput(argPrefix, concreteType(valueType).Kind(), ctx.ArgMapValueTemplate)
+	keyTemplate := prop.getArgTemplate(argPrefix, concreteType(keyType).Kind(), ctx.ArgMapKeyTemplate)
+	valueTemplate := prop.getArgTemplate(argPrefix, concreteType(valueType).Kind(), ctx.ArgMapValueTemplate)
 
 	for {
 		keyTemplate.Index = length + ctx.StartIndex
@@ -451,8 +451,7 @@ func (prop *Property) fromArgsMap(ctx *Context) error {
 	return nil
 }
 
-type ArgTemplate struct {
-	Template *template.Template
+type argTemplate struct {
 	Prefix   string
 	Arg      string
 	Index    int
@@ -461,19 +460,21 @@ type ArgTemplate struct {
 	IsSlice  bool
 	IsMap    bool
 	IsArray  bool
+
+	template *template.Template
 }
 
-func (input ArgTemplate) get() (string, error) {
+func (tpl argTemplate) get() (string, error) {
 	var out bytes.Buffer
-	if err := input.Template.Execute(&out, input); err != nil {
+	if err := tpl.template.Execute(&out, tpl); err != nil {
 		return "", err
 	}
 	return out.String(), nil
 }
 
-func (prop Property) getTemplateInput(argPrefix string, kind reflect.Kind, tpl *template.Template) ArgTemplate {
-	return ArgTemplate{
-		Template: tpl,
+func (prop Property) getArgTemplate(argPrefix string, kind reflect.Kind, tpl *template.Template) argTemplate {
+	return argTemplate{
+		template: tpl,
 		Prefix:   argPrefix,
 		Arg:      prop.Arg,
 		IsSimple: !(kind == reflect.Struct || kind == reflect.Array || kind == reflect.Slice || kind == reflect.Map),
@@ -528,39 +529,76 @@ func (prop *Property) Prompt(ctx *Context) error {
 	return nil
 }
 
-func (prop *Property) promptSimple(ctx *Context) error {
+type promptTemplate struct {
+	Prop         Property
+	PromptText   string
+	DefaultText  string
+	IsDefault    bool
+	CurrentValue any
+	CurrentText  any
+	HideDefault  bool
+	PromptCount  int
+	AfterHelp    bool
+
+	template *template.Template
+}
+
+func (tpl promptTemplate) get() (string, error) {
+	var out bytes.Buffer
+	if err := tpl.template.Execute(&out, tpl); err != nil {
+		return "", err
+	}
+	return out.String(), nil
+}
+
+func (prop Property) getPromptTemplate(tpl *template.Template) promptTemplate {
 	currentValue := prop.Value.Interface()
 	isDefault := isDefaultValue(currentValue)
+	currentText := fmt.Sprintf("%+v", currentValue)
+
+	return promptTemplate{
+		Prop:         prop,
+		PromptText:   prop.PromptText,
+		DefaultText:  prop.DefaultText,
+		HideDefault:  prop.HideDefault,
+		IsDefault:    isDefault,
+		CurrentValue: currentValue,
+		CurrentText:  currentText,
+		PromptCount:  0,
+		AfterHelp:    false,
+
+		template: tpl,
+	}
+}
+
+func (prop *Property) promptSimple(ctx *Context) error {
+	promptTemplate := prop.getPromptTemplate(ctx.PromptTemplate)
 
 	for i := 0; i <= ctx.RepromptOnInvalid; i++ {
-		promptLabel := prop.PromptText
-		if prop.DefaultText != "" {
-			promptLabel = fmt.Sprintf("%s (%s)", promptLabel, prop.DefaultText)
-		} else if !isDefault && !prop.HideDefault {
-			promptLabel = fmt.Sprintf("%s (%+v)", promptLabel, currentValue)
+		promptTemplate.PromptCount = i
+
+		prompt, err := promptTemplate.get()
+		if err != nil {
+			return err
 		}
 
-		userInput, err := ctx.Prompt(promptLabel+": ", *prop)
+		userInput, err := ctx.Prompt(prompt, *prop)
 		if err != nil {
 			return err
 		}
 
 		if userInput == ctx.HelpPrompt && ctx.HelpPrompt != "" && prop.Help != "" && ctx.DisplayHelp != nil {
 			ctx.DisplayHelp(*prop)
-			userInput, err = ctx.Prompt(promptLabel+": ", *prop)
-			if err != nil {
-				return err
-			}
-		}
 
-		reprompt := userInput == "" && isDefault && !prop.IsOptional()
-		if reprompt {
-			userInput, err = ctx.Prompt(promptLabel+" [required]: ", *prop)
+			promptTemplate.AfterHelp = true
+			prompt, err = promptTemplate.get()
 			if err != nil {
 				return err
 			}
-			if userInput == "" {
-				return fmt.Errorf("%s is required", prop.Name)
+
+			userInput, err = ctx.Prompt(prompt, *prop)
+			if err != nil {
+				return err
 			}
 		}
 
@@ -574,7 +612,7 @@ func (prop *Property) promptSimple(ctx *Context) error {
 			} else {
 				break
 			}
-		} else {
+		} else if !promptTemplate.IsDefault || prop.IsOptional() {
 			break
 		}
 	}
