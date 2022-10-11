@@ -195,6 +195,20 @@ func TestPrompt(t *testing.T) {
 			},
 			expected: 33,
 		},
+		{
+			name: "regex",
+			options: PromptOptions{
+				Prompt: "Version > ",
+				Regex:  "^\\d{1,4}\\.\\d{1,3}\\.\\d{1,3}(|\\..+)$",
+				Tries:  5,
+			},
+			prompts: []string{
+				"Version > a",
+				"Version > a.b.c",
+				"Version > 2022.12.0",
+			},
+			expected: "2022.12.0",
+		},
 	}
 
 	for _, test := range tests {

@@ -46,6 +46,8 @@ type Property struct {
 	DefaultText string
 	// The default value in string form. ex: `default`
 	Default string
+	// A regular expression to match.
+	Regex string
 	// A comma delimited map of acceptable values or a map of key/value pairs. ex: `options:"a,b,c"` or `options:"a:1,b:2,c:3"`
 	Choices PromptChoices
 	// Used by strings for min length, numbers for min value (inclusive), or by slices for min length. ex `min:"1"`
@@ -749,6 +751,7 @@ func (prop *Property) promptSimple(ctx *Context) error {
 		Multi:    prop.PromptMulti,
 		Help:     prop.Help,
 		Choices:  prop.Choices,
+		Regex:    prop.Regex,
 		Optional: prop.IsOptional() || !promptTemplate.IsDefault,
 		Tries:    tries,
 		GetPrompt: func(status PromptStatus) (string, error) {
@@ -1004,6 +1007,10 @@ func getStructProperty(field reflect.StructField, value reflect.Value) Property 
 
 	if defaultText, ok := field.Tag.Lookup("default-text"); ok {
 		prop.DefaultText = defaultText
+	}
+
+	if regex, ok := field.Tag.Lookup("regex"); ok {
+		prop.Regex = regex
 	}
 
 	if env, ok := field.Tag.Lookup("env"); ok && env != "" {

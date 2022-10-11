@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"reflect"
+	"regexp"
 	"strings"
 	"text/template"
 
@@ -25,6 +26,9 @@ var NoPrompt = errors.New("NOPROMPT")
 
 // The error returned when no valid value could be gotten from prompt.
 var VerifyFailed = errors.New("NOVERIFY")
+
+// The error returned when the input did not match the specified regular expression.
+var RegexFailed = errors.New("NOREGEX")
 
 // A dynamic set of variables that commands can have access to during unmarshal, capture, and execution.
 type Context struct {
@@ -305,6 +309,8 @@ type PromptOptions struct {
 	Tries int
 	// Help text to display if they request it.
 	Help string
+	// A regular expression to run a first validation pass over the input.
+	Regex string
 	// If the value is optional, allowing the user to enter nothing. nil is returned in this scenario.
 	Optional bool
 	// The property being prompted, if any. This is sent to DisplayHelp.
@@ -380,6 +386,18 @@ func (ctx *Context) Prompt(options PromptOptions) (any, error) {
 
 		if input == "" && options.Optional {
 			return nil, nil
+		}
+
+		if options.Regex != "" {
+			regex, err := regexp.Compile(options.Regex)
+			if err != nil {
+				return nil, err
+			}
+			if !regex.MatchString(input) {
+				status.InvalidFormat++
+				lastError = RegexFailed
+				continue
+			}
 		}
 
 		parsed := input
