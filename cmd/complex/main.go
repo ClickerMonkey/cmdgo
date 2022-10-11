@@ -10,6 +10,7 @@ import (
 type Profile struct {
 	Name        string `prompt:"Your name" min:"2"`
 	Age         *int   `prompt:"Your age"`
+	Password    string `prompt:"Your password" prompt-options:"hidden"`
 	FaveNumbers []int  `prompt:"Favorite numbers" prompt-options:"start:-,end:,more:More?" arg:"favenum" min:"3"`
 	FaveMovies  []struct {
 		Title  string

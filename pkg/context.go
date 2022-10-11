@@ -191,6 +191,7 @@ func NewContext() *Context {
 						return "", err
 					}
 					line = string(bytes)
+					ctx.printf("\n")
 				} else {
 					line, err = ctx.inReader.ReadString('\n')
 					if err != nil && err != io.EOF {
