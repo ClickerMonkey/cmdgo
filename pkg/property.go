@@ -767,49 +767,6 @@ func (prop *Property) promptSimple(ctx *Context) error {
 		prop.Value.Set(reflect.ValueOf(value))
 	}
 
-	// for i := 0; i <= ctx.RepromptOnInvalid; i++ {
-	// 	promptTemplate.PromptCount = i
-
-	// 	prompt, err := promptTemplate.get()
-	// 	if err != nil {
-	// 		return err
-	// 	}
-
-	// 	userInput, err := ctx.PromptOnce(prompt, prop.getPromptOnceOptions())
-	// 	if err != nil {
-	// 		return err
-	// 	}
-
-	// 	if userInput == ctx.HelpPrompt && ctx.HelpPrompt != "" && prop.Help != "" && ctx.DisplayHelp != nil {
-	// 		ctx.DisplayHelp(prop.Help, prop)
-
-	// 		promptTemplate.AfterHelp = true
-	// 		prompt, err = promptTemplate.get()
-	// 		if err != nil {
-	// 			return err
-	// 		}
-
-	// 		userInput, err = ctx.PromptOnce(prompt, prop.getPromptOnceOptions())
-	// 		if err != nil {
-	// 			return err
-	// 		}
-	// 	}
-
-	// 	if userInput != "" {
-	// 		err := prop.Set(userInput, PropertyFlagPrompt)
-	// 		if err != nil {
-	// 			if i < ctx.RepromptOnInvalid {
-	// 				continue
-	// 			}
-	// 			return err
-	// 		} else {
-	// 			break
-	// 		}
-	// 	} else if !promptTemplate.IsDefault || prop.IsOptional() {
-	// 		break
-	// 	}
-	// }
-
 	return nil
 }
 
