@@ -229,7 +229,9 @@ func TestPrompt(t *testing.T) {
 
 		actual, err := ctx.Prompt(test.options)
 
-		if err != nil {
+		if len(test.prompts) > 0 {
+			t.Errorf("Test [%s] has left over prompts: %v", test.name, test.prompts)
+		} else if err != nil {
 			if test.expectedError == nil {
 				t.Errorf("Test [%s] unexpected error: %v", test.name, err)
 			} else if test.expectedError.Error() != err.Error() {

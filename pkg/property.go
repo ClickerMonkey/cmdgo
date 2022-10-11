@@ -30,6 +30,8 @@ type Property struct {
 	PromptEnd string
 	// The text to display when questioning for more. ex: `prompt-options:"more:More?"`
 	PromptMore string
+	// If we should prompt only when the current value is an empty value (not loaded by env, flags, or prompt). ex: `prompt-options:"default"`
+	PromptEmpty bool
 	// If the user input should be hidden for this property. ex: `prompt-options:"hidden"`
 	InputHidden bool
 	// How many tries to get the input. Overrides Context settings. ex: `prompt-options:"tries:4"`
@@ -738,6 +740,15 @@ func (prop Property) getPromptOnceOptions() PromptOnceOptions {
 func (prop *Property) promptSimple(ctx *Context) error {
 	promptTemplate := prop.getPromptTemplate(ctx.PromptContext, ctx.PromptTemplate)
 
+	if prop.PromptEmpty {
+		if !prop.Flags.Is(MatchAny(PropertyFlagDefault)) && !promptTemplate.IsDefault {
+			return nil // user supplied
+		}
+		if prop.Flags.Is(MatchAny(PropertyFlagArgs | PropertyFlagEnv | PropertyFlagPrompt)) {
+			return nil // env/flag/prompt supplied
+		}
+	}
+
 	tries := ctx.RepromptOnInvalid
 	if prop.PromptTries > 0 {
 		tries = prop.PromptTries
@@ -983,6 +994,8 @@ func getStructProperty(field reflect.StructField, value reflect.Value) Property 
 				prop.InputHidden = true
 			case "verify":
 				prop.PromptVerify = true
+			case "empty":
+				prop.PromptEmpty = true
 			case "tries":
 				tries, err := strconv.ParseInt(value, 10, 32)
 				if err != nil {
