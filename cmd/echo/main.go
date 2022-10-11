@@ -1,8 +1,6 @@
 package main
 
 import (
-	"fmt"
-
 	cmdgo "github.com/ClickerMonkey/cmdgo/pkg"
 )
 
@@ -13,7 +11,7 @@ type Echo struct {
 var _ cmdgo.Executable = &Echo{}
 
 func (echo *Echo) Execute(ctx *cmdgo.Context) error {
-	fmt.Printf("\nECHO: %s\n", echo.Message)
+	ctx.Printf("\nECHO: %s\n", echo.Message)
 	return nil
 }
 

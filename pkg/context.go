@@ -174,10 +174,10 @@ func NewContext() *Context {
 			if !ctx.CanPrompt() {
 				return nil
 			}
-			return ctx.printf("%s\n", prop.PromptEnd)
+			return ctx.Printf("%s\n", prop.PromptEnd)
 		},
 		PromptOnce: func(prompt string, options PromptOnceOptions) (string, error) {
-			err := ctx.printf(prompt)
+			err := ctx.Printf(prompt)
 			if err != nil {
 				return "", err
 			}
@@ -191,7 +191,7 @@ func NewContext() *Context {
 						return "", err
 					}
 					line = string(bytes)
-					ctx.printf("\n")
+					ctx.Printf("\n")
 				} else {
 					line, err = ctx.inReader.ReadString('\n')
 					if err != nil && err != io.EOF {
@@ -218,7 +218,7 @@ func NewContext() *Context {
 		RepromptMapValues:     false,
 
 		DisplayHelp: func(help string, prop *Property) {
-			ctx.printf("%s\n", help)
+			ctx.Printf("%s\n", help)
 		},
 	}
 
@@ -270,7 +270,7 @@ func (ctx *Context) Program() *Context {
 }
 
 // Prints text out to the configured output destination.
-func (ctx *Context) printf(format string, args ...any) error {
+func (ctx *Context) Printf(format string, args ...any) error {
 	if ctx.out == nil {
 		return nil
 	}

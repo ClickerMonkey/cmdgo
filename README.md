@@ -17,7 +17,7 @@ type Echo struct {
 }
 
 func (echo *Echo) Execute(ctx cmdgo.Context) error {
-  fmt.Printf("ECHO: %s\n", echo.Message)
+  ctx.Printf("ECHO: %s\n", echo.Message)
   return nil
 }
 
@@ -88,6 +88,10 @@ Various struct tags can be used to control how values are pulled from arguments,
   - `more` A message to display when a value has been added to a map or slice and we want to know if more values should be added. The user must enter y to add more.
   - `end` A message to display when the complex value is done being prompted.
   - `multi` The property accepts multiple lines of input and will stop prompting when an empty line is given.
+  - `hidden` The property input should be hidden from the user. (ex: passwords)
+  - `verify` The user is prompted to re-enter the value to confirm it.
+  - `reprompt` The user is repromproted for existing values in the property slice or map. Has no affect for other types.
+  - `tries` A maximum number of times to try to get a valid value from the user. This overrides the Context's RepromptOnInvalid.
   - Example: `prompt-options:"start:,end:Thank you for your feedback!,multi,more:Do you have any other questions?"`
 - `help` The text to display if the user is prompted for a value and enters "help!" (help text can be changed or disabled on the Context). The prompt will display the help and prompt for a value one more time.
 - `default-text` The text to display in place of the current value for a field. If a field contains sensitive data, you can use this to mask it.
