@@ -27,7 +27,7 @@ type Validator interface {
 }
 
 // A value which has custom prompt handling logic.
-type PromptValue interface {
+type PromptCustom interface {
 	Prompt(ctx *Context, prop *Property) error
 }
 
@@ -35,4 +35,9 @@ type PromptValue interface {
 // and any sub values are not handled with arg or prompt logic.
 type ArgValue interface {
 	FromArgs(ctx *Context, prop *Property, getArg func(arg string, defaultValue string) string) error
+}
+
+// A value which has custom prompt parsing logic.
+type PromptValue interface {
+	FromPrompt(ctx *Context, value string) error
 }

@@ -4,7 +4,7 @@ import "testing"
 
 func TestConvert(t *testing.T) {
 	tests := []struct {
-		options  map[string]string
+		options  PromptChoices
 		text     string
 		expected string
 		invalid  bool
@@ -48,11 +48,7 @@ func TestConvert(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		prop := Property{
-			Options: test.options,
-		}
-
-		converted, err := prop.Convert(test.text)
+		converted, err := test.options.Convert(test.text)
 		if converted != test.expected {
 			t.Errorf("Converted %s does not match expected %s", converted, test.expected)
 		} else if (err != nil) != test.invalid {

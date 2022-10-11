@@ -4,12 +4,14 @@ import (
 	"reflect"
 )
 
+// An instance of a struct and all the properties on it.
 type Instance struct {
 	Value        reflect.Value
 	PropertyMap  map[string]*Property
 	PropertyList []*Property
 }
 
+// Creates an instance given a value.
 func GetInstance(value any) Instance {
 	reflected := reflectValue(value)
 	concrete := concreteValue(reflected)
@@ -25,6 +27,7 @@ func GetInstance(value any) Instance {
 	return instance
 }
 
+// Creates an instance that is appropriate for the given property.
 func GetSubInstance(value any, prop Property) Instance {
 	instance := GetInstance(value)
 
@@ -35,13 +38,14 @@ func GetSubInstance(value any, prop Property) Instance {
 			Name:        prop.Name,
 			PromptText:  prop.PromptText,
 			PromptMulti: prop.PromptMulti,
-			Options:     prop.Options,
+			Choices:     prop.Choices,
 		})
 	}
 
 	return instance
 }
 
+// Capture populates the properties of the instance from arguments and prompting the context.
 func (inst *Instance) Capture(ctx *Context) error {
 	valueRaw := inst.Value.Interface()
 
@@ -91,6 +95,7 @@ func (inst *Instance) Capture(ctx *Context) error {
 	return nil
 }
 
+// Returns if the value in this instance has all default values.
 func (inst Instance) IsDefault() bool {
 	for _, prop := range inst.PropertyList {
 		if !prop.IsDefault() {
@@ -100,6 +105,7 @@ func (inst Instance) IsDefault() bool {
 	return true
 }
 
+// Counts how many properties in this instance match.
 func (inst Instance) Count(match Match[PropertyFlags]) int {
 	count := 0
 	for _, prop := range inst.PropertyList {
@@ -110,6 +116,7 @@ func (inst Instance) Count(match Match[PropertyFlags]) int {
 	return count
 }
 
+// Builds a set of all flags in all properties in this instance.
 func (inst Instance) Flags() Flags[PropertyFlags] {
 	flags := Flags[PropertyFlags]{}
 	for _, prop := range inst.PropertyList {
@@ -118,6 +125,7 @@ func (inst Instance) Flags() Flags[PropertyFlags] {
 	return flags
 }
 
+// Adds a property to the instance.
 func (inst *Instance) AddProperty(prop *Property) {
 	key := Normalize(prop.Name)
 
@@ -125,6 +133,7 @@ func (inst *Instance) AddProperty(prop *Property) {
 	inst.PropertyList = append(inst.PropertyList, prop)
 }
 
+// Adds the properties defined in the struct value to the given instance.
 func addProperties(structValue reflect.Value, instance *Instance) {
 	if structValue.Kind() != reflect.Struct {
 		return

@@ -2,7 +2,6 @@ package cmdgo
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"os"
 	"reflect"
@@ -31,6 +30,12 @@ type Property struct {
 	PromptEnd string
 	// The text to display when questioning for more. ex: `prompt-options:"more:More?"`
 	PromptMore string
+	// If the user input should be hidden for this property. ex: `prompt-options:"hidden"`
+	InputHidden bool
+	// How many tries to get the input. Overrides Context settings. ex: `prompt-options:"tries:4"`
+	PromptTries int
+	// If we should verify the input by reprompting. ex: `prompt-options:"verify"`
+	PromptVerify bool
 	// If the property should reprompt given slice and map values. ex `prompt-options="reprompt"`
 	Reprompt bool
 	// Help text to display for this property if requested by the user. ex: `help:"your help text here"`
@@ -42,7 +47,7 @@ type Property struct {
 	// The default value in string form. ex: `default`
 	Default string
 	// A comma delimited map of acceptable values or a map of key/value pairs. ex: `options:"a,b,c"` or `options:"a:1,b:2,c:3"`
-	Options map[string]string
+	Choices PromptChoices
 	// Used by strings for min length, numbers for min value (inclusive), or by slices for min length. ex `min:"1"`
 	Min *float64
 	// Used by strings for max length, numbers for max value (inclusive), or by slices for max length. ex `max:"10.3"`
@@ -55,41 +60,21 @@ type Property struct {
 	Flags Flags[PropertyFlags]
 }
 
+// Flags which are set on a property during capture.
 type PropertyFlags uint
 
 const (
+	// The property has not been changed.
 	PropertyFlagNone PropertyFlags = (1 << iota) >> 1
+	// The property has had a value populated from arguments.
 	PropertyFlagArgs
+	// The property has had a value populated from prompting.
 	PropertyFlagPrompt
+	// The property has had a value populated from environment variables.
 	PropertyFlagEnv
+	// The property has had a value populated from the `default:""` struct tag.
 	PropertyFlagDefault
 )
-
-var InvalidConversion = errors.New("Invalid conversion.")
-
-func (prop Property) Convert(text string) (string, error) {
-	if prop.Options != nil && len(prop.Options) > 0 {
-		key := Normalize(text)
-		if converted, ok := prop.Options[key]; ok {
-			return converted, nil
-		}
-		if len(key) > 0 {
-			possible := []string{}
-			for optionKey, optionValue := range prop.Options {
-				if strings.HasPrefix(strings.ToLower(optionKey), key) {
-					possible = append(possible, optionValue)
-				}
-			}
-			if len(possible) == 1 {
-				return possible[0], nil
-			}
-		}
-
-		return "", InvalidConversion
-	}
-
-	return text, nil
-}
 
 // Returns whether this property can have its state loaded from environment variables
 // or default tags.
@@ -221,12 +206,12 @@ func (prop Property) promptMore(ctx *Context) (bool, error) {
 	return true, nil
 }
 
-func (prop *Property) getPromptValue(ctx *Context) PromptValue {
+func (prop *Property) getPromptValue(ctx *Context) PromptCustom {
 	candidate := prop.Value
 	if candidate.CanAddr() {
 		candidate = candidate.Addr()
 	}
-	if promptValue, ok := candidate.Interface().(PromptValue); ok {
+	if promptValue, ok := candidate.Interface().(PromptCustom); ok {
 		return promptValue
 	}
 	return nil
@@ -683,16 +668,22 @@ func (prop *Property) Prompt(ctx *Context) error {
 }
 
 type promptTemplate struct {
-	Prop         Property
-	PromptText   string
-	DefaultText  string
-	IsDefault    bool
-	CurrentValue any
-	CurrentText  any
-	HideDefault  bool
-	PromptCount  int
-	AfterHelp    bool
-	Context      PromptContext
+	Prop          Property
+	PromptText    string
+	DefaultText   string
+	IsDefault     bool
+	CurrentValue  any
+	CurrentText   any
+	HideDefault   bool
+	PromptCount   int
+	HasHelp       bool
+	HelpText      string
+	AfterHelp     bool
+	Context       PromptContext
+	InvalidChoice int
+	InvalidFormat int
+	Verify        bool
+	InvalidVerify int
 
 	template *template.Template
 }
@@ -705,6 +696,15 @@ func (tpl promptTemplate) get() (string, error) {
 	return out.String(), nil
 }
 
+func (tpl *promptTemplate) updateStatus(status PromptStatus) {
+	tpl.AfterHelp = status.AfterHelp
+	tpl.PromptCount = status.PromptCount
+	tpl.Verify = status.Verify
+	tpl.InvalidVerify = status.InvalidVerify
+	tpl.InvalidChoice = status.InvalidChoice
+	tpl.InvalidFormat = status.InvalidFormat
+}
+
 func (prop Property) getPromptTemplate(promptContext PromptContext, tpl *template.Template) promptTemplate {
 	currentValue := prop.Value.Interface()
 	isDefault := isDefaultValue(currentValue)
@@ -715,62 +715,100 @@ func (prop Property) getPromptTemplate(promptContext PromptContext, tpl *templat
 		PromptText:   prop.PromptText,
 		DefaultText:  prop.DefaultText,
 		HideDefault:  prop.HideDefault,
+		HasHelp:      prop.Help != "",
+		HelpText:     prop.Help,
 		IsDefault:    isDefault,
 		CurrentValue: currentValue,
 		CurrentText:  currentText,
-		PromptCount:  0,
-		AfterHelp:    false,
 		Context:      promptContext,
 
 		template: tpl,
 	}
 }
 
+func (prop Property) getPromptOnceOptions() PromptOnceOptions {
+	return PromptOnceOptions{
+		Multi:  prop.PromptMulti,
+		Hidden: prop.InputHidden,
+	}
+}
+
 func (prop *Property) promptSimple(ctx *Context) error {
 	promptTemplate := prop.getPromptTemplate(ctx.PromptContext, ctx.PromptTemplate)
 
-	for i := 0; i <= ctx.RepromptOnInvalid; i++ {
-		promptTemplate.PromptCount = i
-
-		prompt, err := promptTemplate.get()
-		if err != nil {
-			return err
-		}
-
-		userInput, err := ctx.Prompt(prompt, *prop)
-		if err != nil {
-			return err
-		}
-
-		if userInput == ctx.HelpPrompt && ctx.HelpPrompt != "" && prop.Help != "" && ctx.DisplayHelp != nil {
-			ctx.DisplayHelp(*prop)
-
-			promptTemplate.AfterHelp = true
-			prompt, err = promptTemplate.get()
-			if err != nil {
-				return err
-			}
-
-			userInput, err = ctx.Prompt(prompt, *prop)
-			if err != nil {
-				return err
-			}
-		}
-
-		if userInput != "" {
-			err := prop.Set(userInput, PropertyFlagPrompt)
-			if err != nil {
-				if i < ctx.RepromptOnInvalid {
-					continue
-				}
-				return err
-			} else {
-				break
-			}
-		} else if !promptTemplate.IsDefault || prop.IsOptional() {
-			break
-		}
+	tries := ctx.RepromptOnInvalid
+	if prop.PromptTries > 0 {
+		tries = prop.PromptTries
 	}
+
+	value, err := ctx.Prompt(PromptOptions{
+		Prop:     prop,
+		Type:     prop.Type,
+		Hidden:   prop.InputHidden,
+		Verify:   prop.PromptVerify,
+		Multi:    prop.PromptMulti,
+		Help:     prop.Help,
+		Choices:  prop.Choices,
+		Optional: prop.IsOptional() || !promptTemplate.IsDefault,
+		Tries:    tries,
+		GetPrompt: func(status PromptStatus) (string, error) {
+			promptTemplate.updateStatus(status)
+
+			return promptTemplate.get()
+		},
+	})
+
+	if err != nil {
+		return err
+	}
+
+	if value != nil {
+		prop.Flags.Set(PropertyFlagPrompt)
+		prop.Value.Set(reflect.ValueOf(value))
+	}
+
+	// for i := 0; i <= ctx.RepromptOnInvalid; i++ {
+	// 	promptTemplate.PromptCount = i
+
+	// 	prompt, err := promptTemplate.get()
+	// 	if err != nil {
+	// 		return err
+	// 	}
+
+	// 	userInput, err := ctx.PromptOnce(prompt, prop.getPromptOnceOptions())
+	// 	if err != nil {
+	// 		return err
+	// 	}
+
+	// 	if userInput == ctx.HelpPrompt && ctx.HelpPrompt != "" && prop.Help != "" && ctx.DisplayHelp != nil {
+	// 		ctx.DisplayHelp(prop.Help, prop)
+
+	// 		promptTemplate.AfterHelp = true
+	// 		prompt, err = promptTemplate.get()
+	// 		if err != nil {
+	// 			return err
+	// 		}
+
+	// 		userInput, err = ctx.PromptOnce(prompt, prop.getPromptOnceOptions())
+	// 		if err != nil {
+	// 			return err
+	// 		}
+	// 	}
+
+	// 	if userInput != "" {
+	// 		err := prop.Set(userInput, PropertyFlagPrompt)
+	// 		if err != nil {
+	// 			if i < ctx.RepromptOnInvalid {
+	// 				continue
+	// 			}
+	// 			return err
+	// 		} else {
+	// 			break
+	// 		}
+	// 	} else if !promptTemplate.IsDefault || prop.IsOptional() {
+	// 		break
+	// 	}
+	// }
 
 	return nil
 }
@@ -790,10 +828,10 @@ func (prop Property) Validate() error {
 		}
 	}
 
-	if prop.Options != nil && len(prop.Options) > 0 {
+	if prop.Choices != nil && len(prop.Choices) > 0 {
 		value := prop.ConcreteValue()
 		found := false
-		for _, optionValue := range prop.Options {
+		for _, optionValue := range prop.Choices {
 			if isTextuallyEqual(value, optionValue, prop.Type) {
 				found = true
 				break
@@ -855,11 +893,14 @@ func (prop Property) Size() float64 {
 }
 
 func (prop *Property) Set(input string, addFlags PropertyFlags) error {
-	converted, err := prop.Convert(input)
-	if err != nil {
-		return err
+	if prop.Choices != nil {
+		converted, err := prop.Choices.Convert(input)
+		if err != nil {
+			return err
+		}
+		input = converted
 	}
-	err = SetString(prop.Value, converted)
+	err := SetString(prop.Value, input)
 	if err == nil {
 		prop.Flags.Set(addFlags)
 	}
@@ -978,6 +1019,16 @@ func getStructProperty(field reflect.StructField, value reflect.Value) Property 
 				prop.PromptEnd = value
 			case "more":
 				prop.PromptMore = value
+			case "hidden":
+				prop.InputHidden = true
+			case "verify":
+				prop.PromptVerify = true
+			case "tries":
+				tries, err := strconv.ParseInt(value, 10, 32)
+				if err != nil {
+					panic(err)
+				}
+				prop.PromptTries = int(tries)
 			}
 		}
 	}
@@ -1024,19 +1075,10 @@ func getStructProperty(field reflect.StructField, value reflect.Value) Property 
 		}
 	}
 
-	if options, ok := field.Tag.Lookup("options"); ok && options != "" {
-		prop.Options = make(map[string]string)
+	prop.Choices = PromptChoices{}
 
-		optionList := strings.Split(options, ",")
-		for _, option := range optionList {
-			keyValue := strings.Split(option, ":")
-			key := keyValue[0]
-			value := key
-			if len(keyValue) > 1 {
-				value = keyValue[1]
-			}
-			prop.Options[Normalize(key)] = value
-		}
+	if options, ok := field.Tag.Lookup("options"); ok && options != "" {
+		prop.Choices.FromTag(options, ",", ":")
 	}
 
 	return prop

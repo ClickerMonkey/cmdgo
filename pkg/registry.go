@@ -7,33 +7,69 @@ import (
 	"fmt"
 	"io/ioutil"
 	"strconv"
+	"strings"
 
 	"gopkg.in/yaml.v2"
 )
 
+// An error returned when no command to capture/execute is given in the arguments.
 var NoCommand = errors.New("No command given.")
 
+// A map of "commands" by name.
 type Registry map[string]any
 
+// An importer that can apply data to a target before Capture is executed.
 type CaptureImporter func(data []byte, target any) error
 
+// Adds a command to the registry with the given name. The name is normalized, essentially ignoring case and punctuation.
 func (r Registry) Add(name string, command any) {
 	r[Normalize(name)] = command
 }
 
-func (r Registry) Get(name string) any {
-	if command, ok := r[Normalize(name)]; ok {
-		copy := cloneDefault(command)
-		return copy
+// Converts the partial name into a matching command name. If no
+// match could be found then an empty string is returned.
+func (r Registry) Convert(namePartial string) (string, bool) {
+	name := Normalize(namePartial)
+
+	if _, ok := r[name]; ok {
+		return name, true
 	}
-	return nil
+
+	lastKey := ""
+	valueCount := 0
+
+	for key := range r {
+		if strings.HasPrefix(key, name) {
+			lastKey = key
+			valueCount++
+		}
+	}
+
+	if valueCount == 1 {
+		return lastKey, true
+	}
+
+	return "", false
 }
 
+// Gets an instance of a command with the given name, or nil if non could be found.
+func (r Registry) Get(name string) any {
+	converted, exists := r.Convert(name)
+	if !exists {
+		return nil
+	}
+	command, _ := r[converted]
+	copy := cloneDefault(command)
+	return copy
+}
+
+// Returns whether the registry has a command with the given name.
 func (r Registry) Has(name string) bool {
-	_, has := r[Normalize(name)]
+	_, has := r.Convert(name)
 	return has
 }
 
+// Executes an executable command based on the given context.
 func (r Registry) Execute(ctx *Context) error {
 	cmd, err := r.Capture(ctx)
 	if err != nil {
@@ -47,6 +83,11 @@ func (r Registry) Execute(ctx *Context) error {
 	return nil
 }
 
+// Captures a command from the context and returns it. The first argument in the context is expected to be the name of the command. If no arguments are given the default "" command is used.
+// The remaining arguments are used to populate the value.
+// If no arguments are specified beyond the name then interactive mode is enabled by default.
+// Interactive (prompt) can be disabled entirely with "--interactive false".
+// Importers are also evaluted, like --json, --xml, and --yaml. The value following is the path to the file to import.
 func (r Registry) Capture(ctx *Context) (any, error) {
 	name := ""
 

@@ -11,10 +11,12 @@ import (
 
 var normalizer, _ = regexp.Compile("[^a-zA-Z0-9]")
 
+// Normalizes the string which removes all non-letters and numbers and converts it to lowercase.
 func Normalize(x string) string {
 	return strings.ToLower(string(normalizer.ReplaceAll([]byte(x), []byte(""))))
 }
 
+// Finds the first argument in args that is named argPrefix+name and returns the value while removing the name & value from args.
 func GetArg(name string, defaultValue string, args *[]string, argPrefix string, flag bool) string {
 	normal := Normalize(name)
 	erase := 0
@@ -55,8 +57,10 @@ func GetArg(name string, defaultValue string, args *[]string, argPrefix string, 
 	return value
 }
 
+// An error returned when we failed setting a value from a given string.
 var InvalidFormat = errors.New("Invalid format.")
 
+// Sets the value based on the given string or returns an error if it couldn't be parsed or set.
 func SetString(value reflect.Value, s string) error {
 	if value.Kind() == reflect.Pointer {
 		concrete := value.Elem()
@@ -101,8 +105,10 @@ func SetString(value reflect.Value, s string) error {
 	return nil
 }
 
+// An error returned when a type cannot be parsed from a string value.
 var UnsupportedType = errors.New("Unsupported type.")
 
+// Returns a value of the given type which is parsed from s, or returns an error.
 func ParseType(t reflect.Type, s string) (any, error) {
 	switch t.Kind() {
 	case reflect.Float32:
@@ -175,6 +181,7 @@ func ParseType(t reflect.Type, s string) (any, error) {
 	return nil, UnsupportedType
 }
 
+// Converts the value to a non-pointer type.
 func concreteValue(value reflect.Value) reflect.Value {
 	for value.Kind() == reflect.Pointer {
 		value = value.Elem()
@@ -182,6 +189,7 @@ func concreteValue(value reflect.Value) reflect.Value {
 	return value
 }
 
+// Converts the type to a non-pointer type.
 func concreteType(typ reflect.Type) reflect.Type {
 	for typ.Kind() == reflect.Pointer {
 		typ = typ.Elem()
@@ -189,11 +197,13 @@ func concreteType(typ reflect.Type) reflect.Type {
 	return typ
 }
 
+// Computes the non-pointer kind of the any value.
 func concreteKind(value any) reflect.Kind {
 	ref := reflectValue(value)
 	return concreteType(ref.Type()).Kind()
 }
 
+// Sets the given value to the given non-pointer concrete value.
 func setConcrete(value reflect.Value, concrete reflect.Value) {
 	// TODO handle pointer of pointers
 	if value.Kind() == reflect.Pointer {
@@ -203,14 +213,17 @@ func setConcrete(value reflect.Value, concrete reflect.Value) {
 	}
 }
 
+// Returns the default value for the given type.
 func defaultValue(t reflect.Type) reflect.Value {
 	return reflect.New(t).Elem()
 }
 
+// Returns a default value of the same type as the given value.
 func cloneDefault(value any) any {
 	return reflect.New(reflect.ValueOf(value).Type()).Interface()
 }
 
+// Initializes the given value to a non-nil value.
 func initialize(value reflect.Value) reflect.Value {
 	if value.Kind() == reflect.Pointer && value.IsNil() {
 		value.Set(initializeType(value.Type()))
@@ -218,12 +231,14 @@ func initialize(value reflect.Value) reflect.Value {
 	return value
 }
 
+// Returns a pointer value to the given value.
 func pointerOf(value reflect.Value) reflect.Value {
 	ptr := reflect.New(value.Type())
 	ptr.Elem().Set(value)
 	return ptr
 }
 
+// Returns a non-nil value of the given type.
 func initializeType(typ reflect.Type) reflect.Value {
 	switch typ.Kind() {
 	case reflect.Pointer:
@@ -237,16 +252,19 @@ func initializeType(typ reflect.Type) reflect.Value {
 	}
 }
 
+// Determines if the given value matches the default value for the type. For comparing values converting to strings and comparing the strings is done.
 func isDefaultValue(value any) bool {
 	defaultValue := defaultValue(reflect.TypeOf(value)).Interface()
 
 	return toString(defaultValue) == toString(value)
 }
 
+// Converts the given value to a string representation.
 func toString(value any) string {
 	return fmt.Sprintf("%+v", value)
 }
 
+// Determines if the value and the text and accompanying textType is equal (has the same string representation).
 func isTextuallyEqual(value any, text string, textType reflect.Type) bool {
 	parsed, err := ParseType(textType, text)
 	if err != nil {
@@ -255,6 +273,7 @@ func isTextuallyEqual(value any, text string, textType reflect.Type) bool {
 	return toString(value) == toString(parsed)
 }
 
+// Returns the reflect.Value of the given value, taking into account it might already be one.
 func reflectValue(value any) reflect.Value {
 	if v, ok := value.(reflect.Value); ok {
 		return v

@@ -69,15 +69,15 @@ func TestSimple(t *testing.T) {
 		ctx := NewContext().WithArgs(append([]string{"simple"}, test.args...))
 		ctx.ArgPrefix = "-"
 		ctx.ForcePrompt = true
-		ctx.Prompt = func(prompt string, prop Property) (string, error) {
+		ctx.PromptOnce = func(prompt string, options PromptOnceOptions) (string, error) {
 			input := test.prompts[prompt]
 			if input == ctx.QuitPrompt {
 				return input, Quit
 			}
 			return input, nil
 		}
-		ctx.DisplayHelp = func(prop Property) {
-			actualHelps = append(actualHelps, prop.Help)
+		ctx.DisplayHelp = func(help string, prop *Property) {
+			actualHelps = append(actualHelps, help)
 		}
 
 		err := Execute(ctx)
@@ -327,7 +327,7 @@ func TestArgValue(t *testing.T) {
 type PromptValueSimple string
 
 func (my *PromptValueSimple) Prompt(ctx *Context, prop *Property) error {
-	v, _ := ctx.Prompt(prop.PromptText+": ", *prop)
+	v, _ := ctx.PromptOnce(prop.PromptText+": ", prop.getPromptOnceOptions())
 	if v != "" {
 		*my = PromptValueSimple(v + v)
 		prop.Flags.Set(PropertyFlagPrompt)
@@ -341,7 +341,7 @@ type PromptValueStruct struct {
 }
 
 func (my *PromptValueStruct) Prompt(ctx *Context, prop *Property) error {
-	v, _ := ctx.Prompt(prop.PromptText+": ", *prop)
+	v, _ := ctx.PromptOnce(prop.PromptText+": ", prop.getPromptOnceOptions())
 	if v != "" {
 		pairs := strings.Split(v, ":")
 		if len(pairs) != 2 {
@@ -388,7 +388,7 @@ func TestPromptValue(t *testing.T) {
 	for _, test := range tests {
 		ctx := NewContext()
 		ctx.ForcePrompt = true
-		ctx.Prompt = func(prompt string, prop Property) (string, error) {
+		ctx.PromptOnce = func(prompt string, options PromptOnceOptions) (string, error) {
 			if len(test.prompts) == 0 {
 				return "", fmt.Errorf("No input left for prompt '%s'", prompt)
 			}
@@ -492,7 +492,7 @@ func TestRepromptMap(t *testing.T) {
 		ctx := NewContext()
 		ctx.RepromptMapValues = true
 		ctx.ForcePrompt = true
-		ctx.Prompt = func(prompt string, prop Property) (string, error) {
+		ctx.PromptOnce = func(prompt string, options PromptOnceOptions) (string, error) {
 			if len(test.prompts) == 0 {
 				return "", fmt.Errorf("No input left for prompt '%s'", prompt)
 			}
@@ -590,7 +590,7 @@ func TestRepromptSlice(t *testing.T) {
 		ctx.ArgPrefix = "-"
 		ctx.RepromptSliceElements = true
 		ctx.ForcePrompt = true
-		ctx.Prompt = func(prompt string, prop Property) (string, error) {
+		ctx.PromptOnce = func(prompt string, options PromptOnceOptions) (string, error) {
 			if len(test.prompts) == 0 {
 				return "", fmt.Errorf("No input left for prompt '%s'", prompt)
 			}
