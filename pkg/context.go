@@ -2,6 +2,7 @@ package cmdgo
 
 import (
 	"bufio"
+	"encoding"
 	"errors"
 	"fmt"
 	"io"
@@ -398,6 +399,13 @@ func (ctx *Context) Prompt(options PromptOptions) (any, error) {
 
 		if promptValue, ok := instance.Interface().(PromptValue); ok {
 			err = promptValue.FromPrompt(ctx, parsed)
+			if err != nil {
+				status.InvalidFormat++
+				lastError = err
+				continue
+			}
+		} else if textUnmarshall, ok := instance.Interface().(encoding.TextUnmarshaler); ok {
+			err = textUnmarshall.UnmarshalText([]byte(parsed))
 			if err != nil {
 				status.InvalidFormat++
 				lastError = err

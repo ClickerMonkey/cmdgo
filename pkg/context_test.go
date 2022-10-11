@@ -1,6 +1,7 @@
 package cmdgo
 
 import (
+	"encoding"
 	"fmt"
 	"reflect"
 	"strings"
@@ -16,6 +17,20 @@ var _ PromptValue = &keyValue{}
 
 func (kv *keyValue) FromPrompt(ctx *Context, x string) error {
 	pair := strings.Split(x, "/")
+	kv.key = pair[0]
+	kv.value = pair[1]
+	return nil
+}
+
+type keyValueText struct {
+	key   string
+	value string
+}
+
+var _ encoding.TextUnmarshaler = &keyValueText{}
+
+func (kv *keyValueText) UnmarshalText(data []byte) error {
+	pair := strings.Split(string(data), "/")
 	kv.key = pair[0]
 	kv.value = pair[1]
 	return nil
@@ -145,6 +160,17 @@ func TestPrompt(t *testing.T) {
 				"Key/Value: a/b",
 			},
 			expected: keyValue{key: "a", value: "b"},
+		},
+		{
+			name: "prompt unmarshal text",
+			options: PromptOptions{
+				Prompt: "Key/Value: ",
+				Type:   reflect.TypeOf(keyValueText{}),
+			},
+			prompts: []string{
+				"Key/Value: a/b",
+			},
+			expected: keyValueText{key: "a", value: "b"},
 		},
 		{
 			name: "get prompt",
