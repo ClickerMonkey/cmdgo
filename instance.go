@@ -45,12 +45,12 @@ func GetSubInstance(value any, prop Property) Instance {
 	return instance
 }
 
-// Capture populates the properties of the instance from arguments and prompting the context.
-func (inst *Instance) Capture(ctx *Context) error {
+// Capture populates the properties of the instance from arguments and prompting the options.
+func (inst *Instance) Capture(opts *Options) error {
 	valueRaw := inst.Value.Interface()
 
 	if dynamic, ok := valueRaw.(Dynamic); ok {
-		err := dynamic.Update(ctx, nil, inst)
+		err := dynamic.Update(opts, nil, inst)
 		if err != nil {
 			return err
 		}
@@ -62,12 +62,12 @@ func (inst *Instance) Capture(ctx *Context) error {
 			return err
 		}
 
-		err = property.FromArgs(ctx)
+		err = property.FromArgs(opts)
 		if err != nil {
 			return err
 		}
 
-		err = property.Prompt(ctx)
+		err = property.Prompt(opts)
 		if err != nil {
 			return err
 		}
@@ -78,7 +78,7 @@ func (inst *Instance) Capture(ctx *Context) error {
 		}
 
 		if dynamic, ok := valueRaw.(Dynamic); ok {
-			err = dynamic.Update(ctx, property, inst)
+			err = dynamic.Update(opts, property, inst)
 			if err != nil {
 				return err
 			}
@@ -86,7 +86,7 @@ func (inst *Instance) Capture(ctx *Context) error {
 	}
 
 	if validate, ok := valueRaw.(Validator); ok {
-		err := validate.Validate(ctx)
+		err := validate.Validate(opts)
 		if err != nil {
 			return err
 		}

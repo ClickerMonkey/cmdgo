@@ -16,16 +16,16 @@ type Echo struct {
   Message string `prompt:"Enter message" help:"The message to enter" default:"Hello World" min:"2" env:"ECHO_MESSAGE" arg:"msg"`
 }
 
-func (echo *Echo) Execute(ctx cmdgo.Context) error {
-  ctx.Printf("ECHO: %s\n", echo.Message)
+func (echo *Echo) Execute(opts cmdgo.Context) error {
+  opts.Printf("ECHO: %s\n", echo.Message)
   return nil
 }
 
 func main() {
   cmdgo.Register("echo", Echo{})
 
-  ctx := cmdgo.NewContext().Program()
-  err := cmdgo.Execute(ctx)
+  opts := cmdgo.NewContext().Program()
+  err := cmdgo.Execute(opts)
   if err != nil {
     panic(err)
   }
@@ -103,5 +103,5 @@ Various struct tags can be used to control how values are pulled from arguments,
 - `max` The maximum allowed slice length, map length, string length, or numeric value (inclusive). When prompting for a map or slice and this length is met capturing will end for the value.
 - `env` The environment variables to look for to populate the field.
 - `arg` The override for the argument name. By default the argument is the normalized name of the field.
-  - `arg:"msg"` (if ctx.ArgPrefix is -- then the user can specify this field value with --msg).
+  - `arg:"msg"` (if opts.ArgPrefix is -- then the user can specify this field value with --msg).
   - `arg:"-"` (does not pull value from the arguments)

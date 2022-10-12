@@ -14,8 +14,8 @@ type SimpleCommand struct {
 
 var _ Executable = &SimpleCommand{}
 
-func (cmd *SimpleCommand) Execute(ctx *Context) error {
-	ctx.Values["result"] = cmd.Message
+func (cmd *SimpleCommand) Execute(opts *Options) error {
+	opts.Values["result"] = cmd.Message
 	return nil
 }
 
@@ -66,29 +66,29 @@ func TestSimple(t *testing.T) {
 	for _, test := range tests {
 		actualHelps := []string{}
 
-		ctx := NewContext().WithArgs(append([]string{"simple"}, test.args...))
-		ctx.ArgPrefix = "-"
-		ctx.ForcePrompt = true
-		ctx.PromptOnce = func(prompt string, options PromptOnceOptions) (string, error) {
+		opts := NewOptions().WithArgs(append([]string{"simple"}, test.args...))
+		opts.ArgPrefix = "-"
+		opts.ForcePrompt = true
+		opts.PromptOnce = func(prompt string, options PromptOnceOptions) (string, error) {
 			input := test.prompts[prompt]
-			if input == ctx.QuitPrompt {
+			if input == opts.QuitPrompt {
 				return input, Quit
 			}
 			return input, nil
 		}
-		ctx.DisplayHelp = func(help string, prop *Property) {
+		opts.DisplayHelp = func(help string, prop *Property) {
 			actualHelps = append(actualHelps, help)
 		}
 
-		err := Execute(ctx)
+		err := Execute(opts)
 		if err != nil {
 			if test.errorText == "" {
 				t.Error(err)
 			} else if test.errorText != err.Error() {
 				t.Errorf("Expected error %s but got %s", test.errorText, err.Error())
 			}
-		} else if ctx.Values["result"] != test.result {
-			t.Errorf("Expected result %s but got %s", test.result, ctx.Values["result"])
+		} else if opts.Values["result"] != test.result {
+			t.Errorf("Expected result %s but got %s", test.result, opts.Values["result"])
 		}
 		if test.helps != nil && len(test.helps) > 0 {
 			if len(test.helps) != len(actualHelps) {
@@ -228,10 +228,10 @@ func TestVaried(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		ctx := NewContext().WithArgs(append([]string{"varied"}, test.args...))
-		ctx.ArgPrefix = "-"
+		opts := NewOptions().WithArgs(append([]string{"varied"}, test.args...))
+		opts.ArgPrefix = "-"
 
-		captured, err := Capture(ctx)
+		captured, err := Capture(opts)
 		if err != nil {
 			t.Errorf("Test [%s] failed with error %v", test.name, err)
 		} else if !equalsJson(captured, test.expected) {
@@ -242,7 +242,7 @@ func TestVaried(t *testing.T) {
 
 type ArgValueSimple string
 
-func (my *ArgValueSimple) FromArgs(ctx *Context, prop *Property, getArg func(arg string, defaultValue string) string) error {
+func (my *ArgValueSimple) FromArgs(opts *Options, prop *Property, getArg func(arg string, defaultValue string) string) error {
 	v := getArg("-"+prop.Arg, "")
 	if v != "" {
 		*my = ArgValueSimple(v + v)
@@ -256,7 +256,7 @@ type ArgValueStruct struct {
 	Age  int
 }
 
-func (my *ArgValueStruct) FromArgs(ctx *Context, prop *Property, getArg func(arg string, defaultValue string) string) error {
+func (my *ArgValueStruct) FromArgs(opts *Options, prop *Property, getArg func(arg string, defaultValue string) string) error {
 	v := getArg("-"+prop.Arg, "")
 	if v != "" {
 		pairs := strings.Split(v, ":")
@@ -310,11 +310,11 @@ func TestArgValue(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		ctx := NewContext().WithArgs(test.args)
-		ctx.ArgPrefix = "-"
+		opts := NewOptions().WithArgs(test.args)
+		opts.ArgPrefix = "-"
 
 		actual := ArgValueCommand{}
-		err := Unmarshal(ctx, &actual)
+		err := Unmarshal(opts, &actual)
 
 		if err != nil {
 			t.Errorf("Test [%s] failed with error %v", test.name, err)
@@ -326,8 +326,8 @@ func TestArgValue(t *testing.T) {
 
 type PromptValueSimple string
 
-func (my *PromptValueSimple) Prompt(ctx *Context, prop *Property) error {
-	v, _ := ctx.PromptOnce(prop.PromptText+": ", prop.getPromptOnceOptions())
+func (my *PromptValueSimple) Prompt(opts *Options, prop *Property) error {
+	v, _ := opts.PromptOnce(prop.PromptText+": ", prop.getPromptOnceOptions())
 	if v != "" {
 		*my = PromptValueSimple(v + v)
 		prop.Flags.Set(PropertyFlagPrompt)
@@ -340,8 +340,8 @@ type PromptValueStruct struct {
 	Age  int
 }
 
-func (my *PromptValueStruct) Prompt(ctx *Context, prop *Property) error {
-	v, _ := ctx.PromptOnce(prop.PromptText+": ", prop.getPromptOnceOptions())
+func (my *PromptValueStruct) Prompt(opts *Options, prop *Property) error {
+	v, _ := opts.PromptOnce(prop.PromptText+": ", prop.getPromptOnceOptions())
 	if v != "" {
 		pairs := strings.Split(v, ":")
 		if len(pairs) != 2 {
@@ -386,9 +386,9 @@ func TestPromptValue(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		ctx := NewContext()
-		ctx.ForcePrompt = true
-		ctx.PromptOnce = func(prompt string, options PromptOnceOptions) (string, error) {
+		opts := NewOptions()
+		opts.ForcePrompt = true
+		opts.PromptOnce = func(prompt string, options PromptOnceOptions) (string, error) {
 			if len(test.prompts) == 0 {
 				return "", fmt.Errorf("No input left for prompt '%s'", prompt)
 			}
@@ -402,7 +402,7 @@ func TestPromptValue(t *testing.T) {
 		}
 
 		actual := PromptValueCommand{}
-		err := Unmarshal(ctx, &actual)
+		err := Unmarshal(opts, &actual)
 
 		if err != nil {
 			t.Errorf("Test [%s] failed with error %v", test.name, err)
@@ -489,10 +489,10 @@ func TestRepromptMap(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		ctx := NewContext()
-		ctx.RepromptMapValues = true
-		ctx.ForcePrompt = true
-		ctx.PromptOnce = func(prompt string, options PromptOnceOptions) (string, error) {
+		opts := NewOptions()
+		opts.RepromptMapValues = true
+		opts.ForcePrompt = true
+		opts.PromptOnce = func(prompt string, options PromptOnceOptions) (string, error) {
 			if len(test.prompts) == 0 {
 				return "", fmt.Errorf("No input left for prompt '%s'", prompt)
 			}
@@ -505,7 +505,7 @@ func TestRepromptMap(t *testing.T) {
 			}
 		}
 
-		err := Unmarshal(ctx, &test.input)
+		err := Unmarshal(opts, &test.input)
 		if err != nil {
 			t.Errorf("Test [%s] failed with error %v", test.name, err)
 		} else if !equalsJson(test.input, test.expected) {
@@ -586,11 +586,11 @@ func TestRepromptSlice(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		ctx := NewContext()
-		ctx.ArgPrefix = "-"
-		ctx.RepromptSliceElements = true
-		ctx.ForcePrompt = true
-		ctx.PromptOnce = func(prompt string, options PromptOnceOptions) (string, error) {
+		opts := NewOptions()
+		opts.ArgPrefix = "-"
+		opts.RepromptSliceElements = true
+		opts.ForcePrompt = true
+		opts.PromptOnce = func(prompt string, options PromptOnceOptions) (string, error) {
 			if len(test.prompts) == 0 {
 				return "", fmt.Errorf("No input left for prompt '%s'", prompt)
 			}
@@ -603,7 +603,7 @@ func TestRepromptSlice(t *testing.T) {
 			}
 		}
 
-		err := Unmarshal(ctx, &test.input)
+		err := Unmarshal(opts, &test.input)
 		if err != nil {
 			t.Errorf("Test [%s] failed with error %v", test.name, err)
 		} else if !equalsJson(test.input, test.expected) {

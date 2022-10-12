@@ -1,7 +1,7 @@
 package main
 
 import (
-	cmdgo "github.com/ClickerMonkey/cmdgo/pkg"
+	"github.com/ClickerMonkey/cmdgo"
 )
 
 type Echo struct {
@@ -10,8 +10,8 @@ type Echo struct {
 
 var _ cmdgo.Executable = &Echo{}
 
-func (echo *Echo) Execute(ctx *cmdgo.Context) error {
-	ctx.Printf("\nECHO: %s\n", echo.Message)
+func (echo *Echo) Execute(opts *cmdgo.Options) error {
+	opts.Printf("\nECHO: %s\n", echo.Message)
 	return nil
 }
 
@@ -19,8 +19,8 @@ func main() {
 	cmdgo.Register("echo", Echo{})
 	cmdgo.Register("", Echo{})
 
-	ctx := cmdgo.NewContext().Program()
-	err := cmdgo.Execute(ctx)
+	opts := cmdgo.NewOptions().Program()
+	err := cmdgo.Execute(opts)
 	if err != nil {
 		panic(err)
 	}

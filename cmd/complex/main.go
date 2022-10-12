@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	cmdgo "github.com/ClickerMonkey/cmdgo/pkg"
+	"github.com/ClickerMonkey/cmdgo"
 )
 
 type Profile struct {
@@ -18,7 +18,7 @@ type Profile struct {
 	} `prompt-options:"start:Do you have any favorite movies?,end:,more:More?" arg:"movies"`
 }
 
-func (prof *Profile) Execute(ctx *cmdgo.Context) error {
+func (prof *Profile) Execute(opts *cmdgo.Options) error {
 	result, _ := json.Marshal(prof)
 	fmt.Printf("\nProfile: %s\n", result)
 
@@ -29,8 +29,8 @@ func main() {
 	cmdgo.Register("profile", Profile{})
 	cmdgo.Register("", Profile{})
 
-	ctx := cmdgo.NewContext().Program()
-	err := cmdgo.Execute(ctx)
+	opts := cmdgo.NewOptions().Program()
+	err := cmdgo.Execute(opts)
 	if err != nil {
 		panic(err)
 	}

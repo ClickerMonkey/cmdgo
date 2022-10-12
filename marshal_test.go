@@ -5,13 +5,13 @@ import "testing"
 func TestUnmarshall(t *testing.T) {
 	tests := []struct {
 		name          string
-		context       *Context
+		options       *Options
 		expected      any
 		expectedError error
 	}{
 		{
 			name:    "simple",
-			context: NewContext().WithArgs([]string{"--message", "Hi"}),
+			options: NewOptions().WithArgs([]string{"--message", "Hi"}),
 			expected: struct {
 				Message string
 			}{
@@ -22,7 +22,7 @@ func TestUnmarshall(t *testing.T) {
 
 	for _, test := range tests {
 		actual := cloneDefault(test.expected)
-		err := Unmarshal(test.context, actual)
+		err := Unmarshal(test.options, actual)
 		if err != nil {
 			if test.expectedError.Error() != err.Error() {
 				t.Errorf("Expected error %s but got %s", test.expectedError.Error(), err.Error())

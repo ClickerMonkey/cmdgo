@@ -15,7 +15,7 @@ type keyValue struct {
 
 var _ PromptValue = &keyValue{}
 
-func (kv *keyValue) FromPrompt(ctx *Context, x string) error {
+func (kv *keyValue) FromPrompt(opts *Options, x string) error {
 	pair := strings.Split(x, "/")
 	kv.key = pair[0]
 	kv.value = pair[1]
@@ -212,9 +212,9 @@ func TestPrompt(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		ctx := NewContext()
-		ctx.ForcePrompt = true
-		ctx.PromptOnce = func(prompt string, options PromptOnceOptions) (string, error) {
+		opts := NewOptions()
+		opts.ForcePrompt = true
+		opts.PromptOnce = func(prompt string, options PromptOnceOptions) (string, error) {
 			if len(test.prompts) == 0 {
 				return "", fmt.Errorf("No input left for prompt '%s'", prompt)
 			}
@@ -227,7 +227,7 @@ func TestPrompt(t *testing.T) {
 			}
 		}
 
-		actual, err := ctx.Prompt(test.options)
+		actual, err := opts.Prompt(test.options)
 
 		if len(test.prompts) > 0 {
 			t.Errorf("Test [%s] has left over prompts: %v", test.name, test.prompts)

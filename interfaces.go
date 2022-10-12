@@ -7,7 +7,7 @@ package cmdgo
 // A command that can be executed after it's data is captured.
 type Executable interface {
 	// Executes the command
-	Execute(ctx *Context) error
+	Execute(opts *Options) error
 }
 
 // A dynamic command will have UpdateDynamic invoked before and after every property
@@ -17,27 +17,27 @@ type Executable interface {
 type Dynamic interface {
 	// The property just updated (or nil if this is the first call) and the map
 	// of command properties that can be dynamically updated
-	Update(ctx *Context, updated *Property, instance *Instance) error
+	Update(opts *Options, updated *Property, instance *Instance) error
 }
 
-// A command can be validated against the current context before it's executed. If an error
+// A command can be validated against the current options before it's executed. If an error
 // is returned then execution never happens.
 type Validator interface {
-	Validate(ctx *Context) error
+	Validate(opts *Options) error
 }
 
 // A value which has custom prompt handling logic.
 type PromptCustom interface {
-	Prompt(ctx *Context, prop *Property) error
+	Prompt(opts *Options, prop *Property) error
 }
 
 // A value which has custom arg handling logic. If this is present, this value
 // and any sub values are not handled with arg or prompt logic.
 type ArgValue interface {
-	FromArgs(ctx *Context, prop *Property, getArg func(arg string, defaultValue string) string) error
+	FromArgs(opts *Options, prop *Property, getArg func(arg string, defaultValue string) string) error
 }
 
 // A value which has custom prompt parsing logic.
 type PromptValue interface {
-	FromPrompt(ctx *Context, value string) error
+	FromPrompt(opts *Options, value string) error
 }

@@ -10,10 +10,10 @@ func Get(name string) any {
 	return GlobalRegistry.Get(name)
 }
 
-func Execute(ctx *Context) error {
-	return GlobalRegistry.Execute(ctx)
+func Execute(opts *Options) error {
+	return GlobalRegistry.Execute(opts)
 }
 
-func Capture(ctx *Context) (any, error) {
-	return GlobalRegistry.Capture(ctx)
+func Capture(opts *Options) (any, error) {
+	return GlobalRegistry.Capture(opts)
 }

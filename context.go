@@ -31,7 +31,7 @@ var VerifyFailed = errors.New("NOVERIFY")
 var RegexFailed = errors.New("NOREGEX")
 
 // A dynamic set of variables that commands can have access to during unmarshal, capture, and execution.
-type Context struct {
+type Options struct {
 	// A general map of values that can be passed and shared between values being parsed, validated, and updated.
 	Values map[string]any
 
@@ -98,8 +98,8 @@ type Context struct {
 	out      *os.File
 }
 
-// A new context which by default has no arguments and does not support prompting.
-func NewContext() *Context {
+// A new options which by default has no arguments and does not support prompting.
+func NewOptions() *Options {
 	promptOptions := map[string]bool{
 		"y":     true,
 		"yes":   true,
@@ -115,9 +115,9 @@ func NewContext() *Context {
 		"false": false,
 	}
 
-	var ctx *Context
+	var opts *Options
 
-	ctx = &Context{
+	opts = &Options{
 		Values: make(map[string]any),
 
 		Args:                make([]string, 0),
@@ -148,41 +148,41 @@ func NewContext() *Context {
 			{{- end }}
 			{{- if .Verify }} (confirm){{- end }}: `),
 		PromptStart: func(prop Property) (bool, error) {
-			if !ctx.CanPrompt() {
+			if !opts.CanPrompt() {
 				return true, nil
 			}
 			for {
-				input, err := ctx.PromptOnce(prop.PromptStart+ctx.PromptStartSuffix, prop.getPromptOnceOptions())
+				input, err := opts.PromptOnce(prop.PromptStart+opts.PromptStartSuffix, prop.getPromptOnceOptions())
 				if err != nil {
 					return false, err
 				}
-				if answer, ok := ctx.PromptStartOptions[strings.ToLower(input)]; ok {
+				if answer, ok := opts.PromptStartOptions[strings.ToLower(input)]; ok {
 					return answer, nil
 				}
 			}
 		},
 		PromptMore: func(prop Property) (bool, error) {
-			if !ctx.CanPrompt() {
+			if !opts.CanPrompt() {
 				return true, nil
 			}
 			for {
-				input, err := ctx.PromptOnce(prop.PromptMore+ctx.PromptMoreSuffix, prop.getPromptOnceOptions())
+				input, err := opts.PromptOnce(prop.PromptMore+opts.PromptMoreSuffix, prop.getPromptOnceOptions())
 				if err != nil {
 					return false, err
 				}
-				if answer, ok := ctx.PromptMoreOptions[strings.ToLower(input)]; ok {
+				if answer, ok := opts.PromptMoreOptions[strings.ToLower(input)]; ok {
 					return answer, nil
 				}
 			}
 		},
 		PromptEnd: func(prop Property) error {
-			if !ctx.CanPrompt() {
+			if !opts.CanPrompt() {
 				return nil
 			}
-			return ctx.Printf("%s\n", prop.PromptEnd)
+			return opts.Printf("%s\n", prop.PromptEnd)
 		},
 		PromptOnce: func(prompt string, options PromptOnceOptions) (string, error) {
-			err := ctx.Printf(prompt)
+			err := opts.Printf(prompt)
 			if err != nil {
 				return "", err
 			}
@@ -191,14 +191,14 @@ func NewContext() *Context {
 			for {
 				line := ""
 				if options.Hidden {
-					bytes, err := term.ReadPassword(int(ctx.in.Fd()))
+					bytes, err := term.ReadPassword(int(opts.in.Fd()))
 					if err != nil {
 						return "", err
 					}
 					line = string(bytes)
-					ctx.Printf("\n")
+					opts.Printf("\n")
 				} else {
-					line, err = ctx.inReader.ReadString('\n')
+					line, err = opts.inReader.ReadString('\n')
 					if err != nil && err != io.EOF {
 						return "", err
 					}
@@ -210,10 +210,10 @@ func NewContext() *Context {
 				}
 			}
 			input = strings.TrimRight(input, "\n")
-			if ctx.QuitPrompt != "" && strings.EqualFold(input, ctx.QuitPrompt) {
+			if opts.QuitPrompt != "" && strings.EqualFold(input, opts.QuitPrompt) {
 				return input, Quit
 			}
-			if ctx.DiscardPrompt != "" && strings.EqualFold(input, ctx.DiscardPrompt) {
+			if opts.DiscardPrompt != "" && strings.EqualFold(input, opts.DiscardPrompt) {
 				return input, Discard
 			}
 			return input, nil
@@ -223,69 +223,69 @@ func NewContext() *Context {
 		RepromptMapValues:     false,
 
 		DisplayHelp: func(help string, prop *Property) {
-			ctx.Printf("%s\n", help)
+			opts.Printf("%s\n", help)
 		},
 	}
 
-	return ctx
+	return opts
 }
 
-// Sets the args for the current context. The given slice is unchanged, a copy is retained and updated on the Context during argument parsing.
-func (ctx *Context) WithArgs(args []string) *Context {
-	ctx.Args = make([]string, len(args))
-	copy(ctx.Args, args)
-	return ctx
+// Sets the args for the current options. The given slice is unchanged, a copy is retained and updated on the Context during argument parsing.
+func (opts *Options) WithArgs(args []string) *Options {
+	opts.Args = make([]string, len(args))
+	copy(opts.Args, args)
+	return opts
 }
 
-// Clears all from the current context.
-func (ctx *Context) ClearArgs() *Context {
-	ctx.Args = []string{}
-	return ctx
+// Clears all from the current options.
+func (opts *Options) ClearArgs() *Options {
+	opts.Args = []string{}
+	return opts
 }
 
-// Sets the files used during prompting for the current context.
-func (ctx *Context) WithFiles(in *os.File, out *os.File) *Context {
-	ctx.in = in
-	ctx.out = out
-	ctx.inReader = bufio.NewReader(in)
-	return ctx
+// Sets the files used during prompting for the current options.
+func (opts *Options) WithFiles(in *os.File, out *os.File) *Options {
+	opts.in = in
+	opts.out = out
+	opts.inReader = bufio.NewReader(in)
+	return opts
 }
 
 // Clears all files used during prompting, effectively disabling prompting unless ForcePrompt is specified.
-func (ctx *Context) ClearFiles() *Context {
-	ctx.in = nil
-	ctx.out = nil
-	ctx.inReader = nil
-	return ctx
+func (opts *Options) ClearFiles() *Options {
+	opts.in = nil
+	opts.out = nil
+	opts.inReader = nil
+	return opts
 }
 
 // Enables prompting using standard in & out.
-func (ctx *Context) Std() *Context {
-	return ctx.WithFiles(os.Stdin, os.Stdout)
+func (opts *Options) Std() *Options {
+	return opts.WithFiles(os.Stdin, os.Stdout)
 }
 
 // Enables argument parsing using the current running programs arguments.
-func (ctx *Context) Cli() *Context {
-	return ctx.WithArgs(os.Args[1:])
+func (opts *Options) Cli() *Options {
+	return opts.WithArgs(os.Args[1:])
 }
 
 // Enables prompting and arguments from the programs stdin, stdout, and args.
-func (ctx *Context) Program() *Context {
-	return ctx.Std().Cli()
+func (opts *Options) Program() *Options {
+	return opts.Std().Cli()
 }
 
 // Prints text out to the configured output destination.
-func (ctx *Context) Printf(format string, args ...any) error {
-	if ctx.out == nil {
+func (opts *Options) Printf(format string, args ...any) error {
+	if opts.out == nil {
 		return nil
 	}
-	_, err := fmt.Fprintf(ctx.out, format, args...)
+	_, err := fmt.Fprintf(opts.out, format, args...)
 	return err
 }
 
-// Returns whether this context can prompt the user.
-func (ctx *Context) CanPrompt() bool {
-	return ctx.ForcePrompt || (ctx.in != nil && !ctx.DisablePrompt)
+// Returns whether this options can prompt the user.
+func (opts *Options) CanPrompt() bool {
+	return opts.ForcePrompt || (opts.in != nil && !opts.DisablePrompt)
 }
 
 // Options used to prompt a user for a value.
@@ -344,8 +344,8 @@ type PromptStatus struct {
 	InvalidVerify int
 }
 
-// Prompts the context for a value given PromptOptions.
-func (ctx *Context) Prompt(options PromptOptions) (any, error) {
+// Prompts the options for a value given PromptOptions.
+func (opts *Options) Prompt(options PromptOptions) (any, error) {
 	once := options.toOnce()
 	status := PromptStatus{}
 	prompt := options.Prompt
@@ -360,13 +360,13 @@ func (ctx *Context) Prompt(options PromptOptions) (any, error) {
 			}
 		}
 
-		input, err := ctx.PromptOnce(prompt, once)
+		input, err := opts.PromptOnce(prompt, once)
 		if err != nil {
 			return nil, err
 		}
 
-		if input == ctx.HelpPrompt && ctx.HelpPrompt != "" && options.Help != "" {
-			ctx.DisplayHelp(options.Help, options.Prop)
+		if input == opts.HelpPrompt && opts.HelpPrompt != "" && options.Help != "" {
+			opts.DisplayHelp(options.Help, options.Prop)
 
 			status.AfterHelp = true
 			if options.GetPrompt != nil {
@@ -376,7 +376,7 @@ func (ctx *Context) Prompt(options PromptOptions) (any, error) {
 				}
 			}
 
-			input, err = ctx.PromptOnce(prompt, once)
+			input, err = opts.PromptOnce(prompt, once)
 			if err != nil {
 				return nil, err
 			}
@@ -416,7 +416,7 @@ func (ctx *Context) Prompt(options PromptOptions) (any, error) {
 		}
 
 		if promptValue, ok := instance.Interface().(PromptValue); ok {
-			err = promptValue.FromPrompt(ctx, parsed)
+			err = promptValue.FromPrompt(opts, parsed)
 			if err != nil {
 				status.InvalidFormat++
 				lastError = err
@@ -446,7 +446,7 @@ func (ctx *Context) Prompt(options PromptOptions) (any, error) {
 					return nil, lastError
 				}
 			}
-			verifyInput, err := ctx.PromptOnce(prompt, once)
+			verifyInput, err := opts.PromptOnce(prompt, once)
 			status.Verify = false
 			if err != nil {
 				return nil, err

@@ -69,34 +69,34 @@ func (r Registry) Has(name string) bool {
 	return has
 }
 
-// Executes an executable command based on the given context.
-func (r Registry) Execute(ctx *Context) error {
-	cmd, err := r.Capture(ctx)
+// Executes an executable command based on the given options.
+func (r Registry) Execute(opts *Options) error {
+	cmd, err := r.Capture(opts)
 	if err != nil {
 		return err
 	}
 
 	if executable, ok := cmd.(Executable); ok {
-		return executable.Execute(ctx)
+		return executable.Execute(opts)
 	}
 
 	return nil
 }
 
-// Captures a command from the context and returns it. The first argument in the context is expected to be the name of the command. If no arguments are given the default "" command is used.
+// Captures a command from the options and returns it. The first argument in the options is expected to be the name of the command. If no arguments are given the default "" command is used.
 // The remaining arguments are used to populate the value.
 // If no arguments are specified beyond the name then interactive mode is enabled by default.
 // Interactive (prompt) can be disabled entirely with "--interactive false".
 // Importers are also evaluted, like --json, --xml, and --yaml. The value following is the path to the file to import.
-func (r Registry) Capture(ctx *Context) (any, error) {
+func (r Registry) Capture(opts *Options) (any, error) {
 	name := ""
 
-	if len(ctx.Args) == 0 {
+	if len(opts.Args) == 0 {
 		if !r.Has(name) {
 			return nil, NoCommand
 		}
 	} else {
-		name = ctx.Args[0]
+		name = opts.Args[0]
 	}
 
 	command := r.Get(name)
@@ -106,18 +106,18 @@ func (r Registry) Capture(ctx *Context) (any, error) {
 	}
 
 	if name != "" {
-		ctx.Args = ctx.Args[1:]
+		opts.Args = opts.Args[1:]
 	}
 
 	interactiveDefault := "false"
-	if len(ctx.Args) == 0 {
+	if len(opts.Args) == 0 {
 		interactiveDefault = "true"
 	}
 
-	interactive, _ := strconv.ParseBool(GetArg("interactive", interactiveDefault, &ctx.Args, ctx.ArgPrefix, true))
+	interactive, _ := strconv.ParseBool(GetArg("interactive", interactiveDefault, &opts.Args, opts.ArgPrefix, true))
 
 	for arg, importer := range CaptureImports {
-		path := GetArg(arg, "", &ctx.Args, ctx.ArgPrefix, false)
+		path := GetArg(arg, "", &opts.Args, opts.ArgPrefix, false)
 		if path != "" {
 			imported, err := ioutil.ReadFile(path)
 			if err != nil {
@@ -131,14 +131,14 @@ func (r Registry) Capture(ctx *Context) (any, error) {
 	}
 
 	if !interactive {
-		ctx.DisablePrompt = true
+		opts.DisablePrompt = true
 		defer func() {
-			ctx.DisablePrompt = false
+			opts.DisablePrompt = false
 		}()
 	}
 
 	commandInstance := GetInstance(command)
-	err := commandInstance.Capture(ctx)
+	err := commandInstance.Capture(opts)
 
 	if err != nil {
 		return nil, err
