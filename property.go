@@ -947,6 +947,10 @@ func (prop Property) ConcreteValue() any {
 	return rawValue
 }
 
+func (prop Property) ConcreteType() reflect.Type {
+	return concreteType(prop.Type)
+}
+
 func getStructProperty(field reflect.StructField, value reflect.Value) Property {
 	prop := Property{
 		Value: value,

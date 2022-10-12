@@ -27,9 +27,11 @@ func (prof *Profile) Execute(opts *cmdgo.Options) error {
 
 func main() {
 	cmdgo.Register(cmdgo.RegistryEntry{
-		Name:    "profile",
-		Aliases: []string{""},
-		Command: Profile{},
+		Name:      "profile",
+		Aliases:   []string{""},
+		HelpShort: "Gets info about you",
+		HelpLong:  "A command which prompts the user for their name, age, password, favorite numbers, and favorite movies.",
+		Command:   Profile{},
 	})
 
 	opts := cmdgo.NewOptions().Program()

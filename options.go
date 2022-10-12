@@ -54,6 +54,8 @@ type Options struct {
 
 	// The text that should trigger display help for the current prompt.
 	HelpPrompt string
+	// The template to use for displaying help about a prop.
+	HelpTemplate *template.Template
 	// The text that should trigger prompting to stop immediately and return a Quit error.
 	QuitPrompt string
 	// The text that should discard the current slice element or map key/value being prompted.
@@ -129,7 +131,71 @@ func NewOptions() *Options {
 		ArgMapKeyTemplate:   newTemplate("{{ .Prefix }}{{ .Arg }}-key{{ if not .IsSimple }}-{{ end }}"),
 		ArgMapValueTemplate: newTemplate("{{ .Prefix }}{{ .Arg }}-value{{ if not .IsSimple }}-{{ end }}"),
 
-		HelpPrompt:         "help!",
+		HelpPrompt: "help!",
+		HelpTemplate: newTemplate(`
+			{{ if .Prop.Help }}
+				- {{ .Prop.Help }}
+			{{ end }}
+			{{ if .Prop.IsSimple }}
+				- A
+				{{- if .Prop.IsOptional -}}
+					n optional
+				{{- end -}}
+				{{ " " }}value of type {{ .Prop.ConcreteType }}.
+			{{ end }}
+			{{ if .Prop.Choices.HasChoices }}
+				- Valid values:
+				{{- range $key, $value := .Prop.Choices -}}
+					{{ " " }}{{ $key }}
+				{{- end -}}
+			{{ else if .Prop.IsBool }}
+				- Valid values: 1, t, true, 0, f, false
+			{{ else if .Prop.IsSlice }}
+				- A list of {{ .Prop.ConcreteType.Elem.Name }}. You can specify the arguments any number of times to populate the list.
+			{{ end }}
+			{{- if not .Prop.HidePrompt }}
+				{{ if .Prop.PromptEmpty }}
+					- Will only be prompted if no value was loaded into it from
+					{{- if .Prop.Env -}}
+					{{ " " }}environment variables or
+					{{- end -}}
+					{{ " " }}arguments.
+				{{ end }}
+				{{ if .Prop.PromptMulti }}
+					- Accepts multiple lines of input, and ends on an empty line.
+				{{ end }}
+				{{ if .Prop.Regex }}
+					- Must match the regular expression /{{ .Prop.Regex }}/
+				{{ end }}
+				{{ if .Prop.PromptVerify }}
+					- Will be prompted twice to confirm the input.
+				{{ end }}
+				{{ if .Prop.InputHidden }}
+					- You won't see the input, the property is considered sensitive.
+				{{ end }}
+			{{- else -}}
+				- Not prompted from the user.
+			{{- end -}}
+			{{ if .Prop.Min }}
+				- Must be a minimum of {{ .Prop.Min }} (inclusive).
+			{{ end }}
+			{{ if .Prop.Max }}
+				- Must be a maximum of {{ .Prop.Max }} (inclusive).
+			{{ end }}
+			{{ if .Prop.Default }}
+				- Has a default value of "{{ .Prop.Default }}".
+			{{ end }}
+			{{ if .Prop.Arg }}
+				- Can be specified with the argument {{ .Arg }}
+			{{ end }}
+			{{ if .Prop.Env }}
+				- Can be populated by the environment variables:
+				{{- range .Prop.Env -}}
+					{{ " " }}{{ . }}
+				{{- end -}}
+			{{ end }}
+		`),
+
 		QuitPrompt:         "quit!",
 		DiscardPrompt:      "discard!",
 		DisablePrompt:      false,

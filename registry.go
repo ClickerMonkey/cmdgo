@@ -13,7 +13,7 @@ import (
 )
 
 // An error returned when no command to capture/execute is given in the arguments.
-var NoCommand = errors.New("No command given.")
+var NoCommand = errors.New("No command given, try running with --help.")
 
 // A map of "commands" by name.
 type Registry struct {
@@ -132,6 +132,12 @@ type CaptureImporter func(data []byte, target any) error
 // Importers are also evaluted, like --json, --xml, and --yaml. The value following is the path to the file to import.
 func (r Registry) Capture(opts *Options) (any, error) {
 	name := ""
+
+	argsLength := len(opts.Args)
+	help := GetArg("help", "", &opts.Args, opts.ArgPrefix, false)
+	if argsLength != len(opts.Args) {
+		return nil, displayHelp(opts, r, help)
+	}
 
 	if len(opts.Args) == 0 {
 		if !r.Has(name) {
