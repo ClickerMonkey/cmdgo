@@ -16,8 +16,11 @@ func (echo *Echo) Execute(opts *cmdgo.Options) error {
 }
 
 func main() {
-	cmdgo.Register("echo", Echo{})
-	cmdgo.Register("", Echo{})
+	cmdgo.Register(cmdgo.RegistryEntry{
+		Name:    "echo",
+		Aliases: []string{""},
+		Command: Echo{},
+	})
 
 	opts := cmdgo.NewOptions().Program()
 	err := cmdgo.Execute(opts)

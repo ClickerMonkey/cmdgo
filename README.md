@@ -9,22 +9,25 @@ package main
 
 import (
   "fmt"
-  cmdgo "github.com/ClickerMonkey/cmdgo/pkg"
+  "github.com/ClickerMonkey/cmdgo"
 )
 
 type Echo struct {
   Message string `prompt:"Enter message" help:"The message to enter" default:"Hello World" min:"2" env:"ECHO_MESSAGE" arg:"msg"`
 }
 
-func (echo *Echo) Execute(opts cmdgo.Context) error {
+func (echo *Echo) Execute(opts cmdgo.Options) error {
   opts.Printf("ECHO: %s\n", echo.Message)
   return nil
 }
 
 func main() {
-  cmdgo.Register("echo", Echo{})
+  cmdgo.Register(cmdgo.RegistryEntry{
+    Name: "echo", 
+    Command: Echo{},
+  })
 
-  opts := cmdgo.NewContext().Program()
+  opts := cmdgo.NewOptions().Program()
   err := cmdgo.Execute(opts)
   if err != nil {
     panic(err)

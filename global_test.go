@@ -20,7 +20,7 @@ func (cmd *SimpleCommand) Execute(opts *Options) error {
 }
 
 func TestSimple(t *testing.T) {
-	Register("simple", SimpleCommand{})
+	Register(RegistryEntry{Name: "simple", Command: SimpleCommand{}})
 
 	tests := []struct {
 		args      []string
@@ -128,7 +128,7 @@ type VariedCommand struct {
 }
 
 func TestVaried(t *testing.T) {
-	Register("varied", VariedCommand{})
+	Register(RegistryEntry{Name: "varied", Command: VariedCommand{}})
 
 	tests := []struct {
 		name     string

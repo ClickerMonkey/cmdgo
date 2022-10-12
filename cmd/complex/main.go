@@ -26,8 +26,11 @@ func (prof *Profile) Execute(opts *cmdgo.Options) error {
 }
 
 func main() {
-	cmdgo.Register("profile", Profile{})
-	cmdgo.Register("", Profile{})
+	cmdgo.Register(cmdgo.RegistryEntry{
+		Name:    "profile",
+		Aliases: []string{""},
+		Command: Profile{},
+	})
 
 	opts := cmdgo.NewOptions().Program()
 	err := cmdgo.Execute(opts)

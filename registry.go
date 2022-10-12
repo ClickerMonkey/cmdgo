@@ -16,57 +16,96 @@ import (
 var NoCommand = errors.New("No command given.")
 
 // A map of "commands" by name.
-type Registry map[string]any
-
-// An importer that can apply data to a target before Capture is executed.
-type CaptureImporter func(data []byte, target any) error
-
-// Adds a command to the registry with the given name. The name is normalized, essentially ignoring case and punctuation.
-func (r Registry) Add(name string, command any) {
-	r[Normalize(name)] = command
+type Registry struct {
+	entries  []*RegistryEntry
+	entryMap map[string]*RegistryEntry
 }
 
-// Converts the partial name into a matching command name. If no
-// match could be found then an empty string is returned.
-func (r Registry) Convert(namePartial string) (string, bool) {
+func NewRegistry() Registry {
+	return Registry{
+		entries:  make([]*RegistryEntry, 0),
+		entryMap: make(map[string]*RegistryEntry),
+	}
+}
+
+// An entry for a registered command.
+type RegistryEntry struct {
+	// The user friendly name of the command.
+	Name string
+	// Aliases of the command.
+	Aliases []string
+	// A short description of the command (one line).
+	HelpShort string
+	// A long description of the command.
+	HelpLong string
+	// An instance of the command.
+	Command any
+}
+
+// Adds a command to the registry.
+func (r *Registry) Add(entry RegistryEntry) {
+	r.entries = append(r.entries, &entry)
+	r.entryMap[Normalize(entry.Name)] = &entry
+	if entry.Aliases != nil {
+		for _, alias := range entry.Aliases {
+			r.entryMap[Normalize(alias)] = &entry
+		}
+	}
+}
+
+// Returns all commands registered to this registry.
+func (r Registry) Entries() []*RegistryEntry {
+	return r.entries
+}
+
+// Returns all commands that match the partial name.
+func (r Registry) Matches(namePartial string) []*RegistryEntry {
 	name := Normalize(namePartial)
 
-	if _, ok := r[name]; ok {
-		return name, true
+	if entry, ok := r.entryMap[name]; ok {
+		return []*RegistryEntry{entry}
 	}
 
-	lastKey := ""
-	valueCount := 0
+	if name == "" {
+		return []*RegistryEntry{}
+	}
 
-	for key := range r {
+	matchMap := make(map[string]*RegistryEntry)
+	for key, entry := range r.entryMap {
 		if strings.HasPrefix(key, name) {
-			lastKey = key
-			valueCount++
+			matchMap[entry.Name] = entry
 		}
 	}
 
-	if valueCount == 1 {
-		return lastKey, true
+	matches := make([]*RegistryEntry, 0, len(matchMap))
+	for _, entry := range matchMap {
+		matches = append(matches, entry)
 	}
 
-	return "", false
+	return matches
+}
+
+// Returns the entry which matches the name only if one entry does.
+func (r Registry) EntryFor(namePartial string) *RegistryEntry {
+	matches := r.Matches(namePartial)
+	if len(matches) == 1 {
+		return matches[0]
+	}
+	return nil
 }
 
 // Gets an instance of a command with the given name, or nil if non could be found.
-func (r Registry) Get(name string) any {
-	converted, exists := r.Convert(name)
-	if !exists {
+func (r Registry) Get(namePartial string) any {
+	entry := r.EntryFor(namePartial)
+	if entry == nil {
 		return nil
 	}
-	command, _ := r[converted]
-	copy := cloneDefault(command)
-	return copy
+	return cloneDefault(entry.Command)
 }
 
 // Returns whether the registry has a command with the given name.
-func (r Registry) Has(name string) bool {
-	_, has := r.Convert(name)
-	return has
+func (r Registry) Has(namePartial string) bool {
+	return r.EntryFor(namePartial) != nil
 }
 
 // Executes an executable command based on the given options.
@@ -82,6 +121,9 @@ func (r Registry) Execute(opts *Options) error {
 
 	return nil
 }
+
+// An importer that can apply data to a target before Capture is executed.
+type CaptureImporter func(data []byte, target any) error
 
 // Captures a command from the options and returns it. The first argument in the options is expected to be the name of the command. If no arguments are given the default "" command is used.
 // The remaining arguments are used to populate the value.
