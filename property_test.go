@@ -10,37 +10,37 @@ func TestConvert(t *testing.T) {
 		invalid  bool
 	}{
 		{
-			options: map[string]string{
-				"a": "a",
-				"b": "b",
-				"c": "c",
+			options: PromptChoices{
+				"a": PromptChoice{Value: "a"},
+				"b": PromptChoice{Value: "b"},
+				"c": PromptChoice{Value: "c"},
 			},
 			text:     "A",
 			expected: "a",
 		},
 		{
-			options: map[string]string{
-				"apple":  "1",
-				"blue":   "2",
-				"banana": "3",
+			options: PromptChoices{
+				"apple":  PromptChoice{Value: "1"},
+				"blue":   PromptChoice{Value: "2"},
+				"banana": PromptChoice{Value: "3"},
 			},
 			text:     "A",
 			expected: "1",
 		},
 		{
-			options: map[string]string{
-				"apple":  "1",
-				"blue":   "2",
-				"banana": "3",
+			options: PromptChoices{
+				"apple":  PromptChoice{Value: "1"},
+				"blue":   PromptChoice{Value: "2"},
+				"banana": PromptChoice{Value: "3"},
 			},
 			text:    "b",
 			invalid: true,
 		},
 		{
-			options: map[string]string{
-				"apple":  "1",
-				"blue":   "2",
-				"banana": "3",
+			options: PromptChoices{
+				"apple":  PromptChoice{Value: "1"},
+				"blue":   PromptChoice{Value: "2"},
+				"banana": PromptChoice{Value: "3"},
 			},
 			text:     "ba",
 			expected: "3",

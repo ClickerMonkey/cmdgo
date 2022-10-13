@@ -119,8 +119,11 @@ func TestPrompt(t *testing.T) {
 		{
 			name: "choices string",
 			options: PromptOptions{
-				Prompt:  "1 or 2?: ",
-				Choices: PromptChoices{"1": "x", "2": "y"},
+				Prompt: "1 or 2?: ",
+				Choices: PromptChoices{
+					"1": PromptChoice{Value: "x"},
+					"2": PromptChoice{Value: "y"},
+				},
 			},
 			prompts: []string{
 				"1 or 2?: 1",
@@ -130,8 +133,11 @@ func TestPrompt(t *testing.T) {
 		{
 			name: "choices partial",
 			options: PromptOptions{
-				Prompt:  "apple or banana?: ",
-				Choices: PromptChoices{"apple": "apple", "banana": "banana"},
+				Prompt: "apple or banana?: ",
+				Choices: PromptChoices{
+					"apple":  PromptChoice{Value: "apple"},
+					"banana": PromptChoice{Value: "banana"},
+				},
 			},
 			prompts: []string{
 				"apple or banana?: a",
@@ -141,9 +147,12 @@ func TestPrompt(t *testing.T) {
 		{
 			name: "choices int",
 			options: PromptOptions{
-				Prompt:  "1 or 2?: ",
-				Type:    reflect.TypeOf(0),
-				Choices: PromptChoices{"1": "4", "2": "8"},
+				Prompt: "1 or 2?: ",
+				Type:   reflect.TypeOf(0),
+				Choices: PromptChoices{
+					"1": PromptChoice{Value: "4"},
+					"2": PromptChoice{Value: "8"},
+				},
 			},
 			prompts: []string{
 				"1 or 2?: 2",

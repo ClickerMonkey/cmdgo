@@ -802,8 +802,8 @@ func (prop Property) Validate() error {
 	if prop.Choices != nil && len(prop.Choices) > 0 {
 		value := prop.ConcreteValue()
 		found := false
-		for _, optionValue := range prop.Choices {
-			if isTextuallyEqual(value, optionValue, prop.Type) {
+		for _, option := range prop.Choices {
+			if isTextuallyEqual(value, option.Value, prop.Type) {
 				found = true
 				break
 			}
