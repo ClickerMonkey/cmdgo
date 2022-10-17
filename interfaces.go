@@ -41,3 +41,8 @@ type ArgValue interface {
 type PromptValue interface {
 	FromPrompt(opts *Options, value string) error
 }
+
+// A value which has user defined options.
+type HasChoices interface {
+	GetChoices(opts *Options, prop *Property) PromptChoices
+}

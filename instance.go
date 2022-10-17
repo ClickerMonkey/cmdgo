@@ -57,7 +57,7 @@ func (inst *Instance) Capture(opts *Options) error {
 	}
 
 	for _, property := range inst.PropertyList {
-		err := property.Load()
+		err := property.Load(opts)
 		if err != nil {
 			return err
 		}
@@ -72,7 +72,7 @@ func (inst *Instance) Capture(opts *Options) error {
 			return err
 		}
 
-		err = property.Validate()
+		err = property.Validate(opts)
 		if err != nil {
 			return err
 		}

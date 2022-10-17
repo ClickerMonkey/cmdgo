@@ -88,7 +88,7 @@ func (prop Property) CanLoad() bool {
 
 // Loads the initial value of the property from environment variables
 // or default tags specified on the struct fields.
-func (prop *Property) Load() error {
+func (prop *Property) Load(opts *Options) error {
 	if !prop.CanLoad() {
 		return nil
 	}
@@ -110,7 +110,7 @@ func (prop *Property) Load() error {
 		flag = PropertyFlagDefault
 	}
 	if text != "" {
-		return prop.Set(text, flag)
+		return prop.Set(opts, text, flag)
 	}
 	return nil
 }
@@ -174,7 +174,7 @@ func (prop *Property) FromArgs(opts *Options) error {
 func (prop *Property) fromArgsSimple(opts *Options) error {
 	value := GetArg(prop.Arg, "", &opts.Args, opts.ArgPrefix, prop.IsBool())
 	if value != "" {
-		return prop.Set(value, PropertyFlagArgs)
+		return prop.Set(opts, value, PropertyFlagArgs)
 	}
 
 	return nil
@@ -761,7 +761,7 @@ func (prop *Property) promptSimple(opts *Options) error {
 		Verify:   prop.PromptVerify,
 		Multi:    prop.PromptMulti,
 		Help:     prop.Help,
-		Choices:  prop.Choices,
+		Choices:  prop.GetPromptChoices(opts),
 		Regex:    prop.Regex,
 		Optional: prop.IsOptional() || !promptTemplate.IsDefault,
 		Tries:    tries,
@@ -784,7 +784,7 @@ func (prop *Property) promptSimple(opts *Options) error {
 	return nil
 }
 
-func (prop Property) Validate() error {
+func (prop Property) Validate(opts *Options) error {
 	if !prop.IsIgnored() {
 		return nil
 	}
@@ -799,10 +799,12 @@ func (prop Property) Validate() error {
 		}
 	}
 
-	if prop.Choices != nil && len(prop.Choices) > 0 {
+	choices := prop.GetPromptChoices(opts)
+
+	if choices != nil && choices.HasChoices() {
 		value := prop.ConcreteValue()
 		found := false
-		for _, option := range prop.Choices {
+		for _, option := range choices {
 			if isTextuallyEqual(value, option.Value, prop.Type) {
 				found = true
 				break
@@ -863,9 +865,10 @@ func (prop Property) Size() float64 {
 	return 0
 }
 
-func (prop *Property) Set(input string, addFlags PropertyFlags) error {
-	if prop.Choices != nil {
-		converted, err := prop.Choices.Convert(input)
+func (prop *Property) Set(opts *Options, input string, addFlags PropertyFlags) error {
+	choices := prop.GetPromptChoices(opts)
+	if choices != nil && choices.HasChoices() {
+		converted, err := choices.Convert(input)
 		if err != nil {
 			return err
 		}
@@ -876,6 +879,16 @@ func (prop *Property) Set(input string, addFlags PropertyFlags) error {
 		prop.Flags.Set(addFlags)
 	}
 	return err
+}
+
+func (prop *Property) GetPromptChoices(opts *Options) PromptChoices {
+	if prop.Choices != nil && prop.Choices.HasChoices() {
+		return prop.Choices
+	}
+	if hasChoices, ok := prop.Value.Interface().(HasChoices); ok {
+		return hasChoices.GetChoices(opts, prop)
+	}
+	return nil
 }
 
 func (prop Property) IsDefault() bool {

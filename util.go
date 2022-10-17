@@ -3,10 +3,13 @@ package cmdgo
 import (
 	"errors"
 	"fmt"
+	"os"
+	"os/signal"
 	"reflect"
 	"regexp"
 	"strconv"
 	"strings"
+	"syscall"
 )
 
 var normalizer, _ = regexp.Compile("[^a-zA-Z0-9]")
@@ -55,6 +58,17 @@ func GetArg(name string, defaultValue string, args *[]string, argPrefix string, 
 	}
 
 	return value
+}
+
+// Notifies the function when the exit signal is sent.
+func CaptureExitSignal(f func()) {
+	cSignal := make(chan os.Signal, 1)
+	signal.Notify(cSignal, os.Interrupt, syscall.SIGTERM)
+	go func() {
+		for range cSignal {
+			f()
+		}
+	}()
 }
 
 // An error returned when we failed setting a value from a given string.

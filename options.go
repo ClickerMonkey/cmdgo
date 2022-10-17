@@ -56,6 +56,13 @@ type Options struct {
 	HelpPrompt string
 	// The template to use for displaying help about a prop.
 	HelpTemplate *template.Template
+	// Displays the requested help to the user.
+	DisplayHelp func(help string, prop *Property)
+	// The number of characters before we wrap the help.
+	HelpWrapWidth int
+	// The number of spaces to indent for properties, sub properties, etc.
+	HelpIndentWidth int
+
 	// The text that should trigger prompting to stop immediately and return a Quit error.
 	QuitPrompt string
 	// The text that should discard the current slice element or map key/value being prompted.
@@ -90,9 +97,6 @@ type Options struct {
 	RepromptMapValues bool
 	// How many times the user should be prompted for a valid value.
 	RepromptOnInvalid int
-
-	// Displays the requested help to the user.
-	DisplayHelp func(help string, prop *Property)
 
 	// Used for displaying and obtaining prompts.
 	in       *os.File
@@ -186,7 +190,11 @@ func NewOptions() *Options {
 				- Has a default value of "{{ .Prop.Default }}".
 			{{ end }}
 			{{ if .Prop.Arg }}
-				- Can be specified with the argument {{ .Arg }}
+				{{ if .Prop.IsSimple }}
+					- Can be specified with the argument {{ .Arg }}
+				{{ else }}
+					- Has inner values that can be specified with arguments with the prefix {{ .Arg }}
+				{{ end }}
 			{{ end }}
 			{{ if .Prop.Env }}
 				- Can be populated by the environment variables:
@@ -195,6 +203,8 @@ func NewOptions() *Options {
 				{{- end -}}
 			{{ end }}
 		`),
+		HelpWrapWidth:   120,
+		HelpIndentWidth: 2,
 
 		QuitPrompt:         "quit!",
 		DiscardPrompt:      "discard!",
@@ -352,6 +362,21 @@ func (opts *Options) Printf(format string, args ...any) error {
 // Returns whether this options can prompt the user.
 func (opts *Options) CanPrompt() bool {
 	return opts.ForcePrompt || (opts.in != nil && !opts.DisablePrompt)
+}
+
+// Closes any input set on the options.
+func (opts *Options) Close() error {
+	if opts.in != nil {
+		return opts.in.Close()
+	}
+	return nil
+}
+
+// Stops capturing user input if the exit signal is sent.
+func (opts *Options) CaptureExitSignal() {
+	CaptureExitSignal(func() {
+		opts.Close()
+	})
 }
 
 // Options used to prompt a user for a value.

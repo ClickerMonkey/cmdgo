@@ -150,13 +150,13 @@ func displayEntryHelp(opts *Options, entry *RegistryEntry) error {
 			argTemplate.Index = opts.ArgStartIndex
 
 			switch {
-			case argTemplate.IsArray:
+			case prop.IsArray():
 				argTemplate.template = opts.ArgArrayTemplate
-			case argTemplate.IsSlice:
+			case prop.IsSlice():
 				argTemplate.template = opts.ArgSliceTemplate
-			case argTemplate.IsStruct:
+			case prop.IsStruct():
 				argTemplate.template = opts.ArgStructTemplate
-			case argTemplate.IsMap:
+			case prop.IsMap():
 				argTemplate.template = opts.ArgMapKeyTemplate
 			}
 
@@ -172,7 +172,7 @@ func displayEntryHelp(opts *Options, entry *RegistryEntry) error {
 			helpTpl.Prop = *prop
 
 			opts.Printf("%s%s\n", strings.Repeat(" ", depth*2), prop.Name)
-			help := helpTpl.formatted(depth*2+2, 80, 2)
+			help := helpTpl.formatted((depth+1)*opts.HelpIndentWidth, opts.HelpWrapWidth, opts.HelpIndentWidth)
 			if help != "" {
 				opts.Printf("%s\n", help)
 			}

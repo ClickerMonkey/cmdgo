@@ -35,6 +35,8 @@ func main() {
 	})
 
 	opts := cmdgo.NewOptions().Program()
+	opts.CaptureExitSignal()
+
 	err := cmdgo.Execute(opts)
 	if err != nil {
 		panic(err)
