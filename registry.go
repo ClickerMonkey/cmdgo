@@ -122,6 +122,31 @@ func (r Registry) Execute(opts *Options) error {
 	return nil
 }
 
+// Returns an instance of the command that would be captured based on the given options.
+// nil is returned if the options is missing a valid command or is requesting for help.
+func (r Registry) Peek(opts *Options) any {
+	name := ""
+	args := opts.Args[:]
+	argsLength := len(args)
+
+	GetArg("help", "", &args, opts.ArgPrefix, false)
+	if argsLength != len(args) {
+		return nil
+	}
+
+	if len(args) == 0 {
+		if !r.Has(name) {
+			return nil
+		}
+	} else {
+		name = args[0]
+	}
+
+	command := r.Get(name)
+
+	return command
+}
+
 // An importer that can apply data to a target before Capture is executed.
 type CaptureImporter func(data []byte, target any) error
 
