@@ -6,7 +6,7 @@ import (
 )
 
 // An error returned when input is given to prompt choices and no choices could be determined.
-var InvalidConversion = errors.New("Invalid conversion.")
+var ErrInvalidConversion = errors.New("invalid conversion")
 
 // A choice when prompting/parsing arg text values.
 type PromptChoice struct {
@@ -65,7 +65,7 @@ func (pc PromptChoices) Convert(input string) (string, error) {
 		}
 	}
 
-	return "", InvalidConversion
+	return "", ErrInvalidConversion
 }
 
 // Returns whether there are any choices defined.

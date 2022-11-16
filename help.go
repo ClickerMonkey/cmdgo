@@ -79,7 +79,7 @@ func displayHelp(opts *Options, registry Registry, help string) error {
 }
 
 func displayRootHelp(opts *Options, registry Registry) {
-	entries := registry.Entries()
+	entries := registry.EntriesAll()
 	maxLength := 0
 	for _, entry := range entries {
 		if len(entry.Name) > maxLength {

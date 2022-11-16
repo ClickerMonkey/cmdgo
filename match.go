@@ -22,7 +22,7 @@ func MatchOnly[T constraints.Integer](test T) Match[T] {
 // Creates a match which returns true if a given value and test are equal.
 func MatchExact[T constraints.Integer](test T) Match[T] {
 	return func(value T) bool {
-		return value&value == test
+		return value == test
 	}
 }
 
@@ -43,7 +43,7 @@ func MatchNone[T constraints.Integer](test T) Match[T] {
 // Creates a match which returns true when a given value is zero.
 func MatchEmpty[T constraints.Integer]() Match[T] {
 	return func(value T) bool {
-		return value&value == 0
+		return value == 0
 	}
 }
 

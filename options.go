@@ -2,6 +2,7 @@ package cmdgo
 
 import (
 	"bufio"
+	"context"
 	"encoding"
 	"errors"
 	"fmt"
@@ -16,27 +17,32 @@ import (
 )
 
 // The error returned when the user requested to quit prompting.
-var Quit = errors.New("QUIT")
+var ErrQuit = errors.New("QUIT")
 
 // The error returned when the user requested to discard the current value being prompted for a complex type.
-var Discard = errors.New("DISCARD")
+var ErrDiscard = errors.New("DISCARD")
 
 // The error returned when no valid value could be gotten from prompt.
-var NoPrompt = errors.New("NOPROMPT")
+var ErrNoPrompt = errors.New("NOPROMPT")
 
 // The error returned when no valid value could be gotten from prompt.
-var VerifyFailed = errors.New("NOVERIFY")
+var ErrVerifyFailed = errors.New("NOVERIFY")
 
 // The error returned when the input did not match the specified regular expression.
-var RegexFailed = errors.New("NOREGEX")
+var ErrRegexFailed = errors.New("NOREGEX")
 
 // A dynamic set of variables that commands can have access to during unmarshal, capture, and execution.
 type Options struct {
 	// A general map of values that can be passed and shared between values being parsed, validated, and updated.
 	Values map[string]any
 
+	// A context can be passed and will be monitored by cmdgo. Defaults to context.Background()
+	ctx context.Context
+
 	// The arguments to parse out
 	Args []string
+	// The arguments to parse out (before values were pulled out of it)
+	ArgsOriginal []string
 	// The prefix all argument names have, to differentiate argument names to values.
 	ArgPrefix string
 	// The number arrays and maps should start for argument parsing. The number will be in the argument name for arrays or for slices with complex values.
@@ -126,7 +132,10 @@ func NewOptions() *Options {
 	opts = &Options{
 		Values: make(map[string]any),
 
+		ctx: context.Background(),
+
 		Args:                make([]string, 0),
+		ArgsOriginal:        make([]string, 0),
 		ArgPrefix:           "--",
 		ArgStartIndex:       1,
 		ArgStructTemplate:   newTemplate("{{ .Prefix }}{{ .Arg }}-"),
@@ -287,10 +296,10 @@ func NewOptions() *Options {
 			}
 			input = strings.TrimRight(input, "\n")
 			if opts.QuitPrompt != "" && strings.EqualFold(input, opts.QuitPrompt) {
-				return input, Quit
+				return input, ErrQuit
 			}
 			if opts.DiscardPrompt != "" && strings.EqualFold(input, opts.DiscardPrompt) {
-				return input, Discard
+				return input, ErrDiscard
 			}
 			return input, nil
 		},
@@ -308,14 +317,32 @@ func NewOptions() *Options {
 
 // Sets the args for the current options. The given slice is unchanged, a copy is retained and updated on the Context during argument parsing.
 func (opts *Options) WithArgs(args []string) *Options {
-	opts.Args = make([]string, len(args))
-	copy(opts.Args, args)
+	opts.Args = args[:]
+	opts.ArgsOriginal = args[:]
+	return opts
+}
+
+// Sets the context for the current options.
+func (opts *Options) Context() context.Context {
+	return opts.ctx
+}
+
+// Sets the context for the current options.
+func (opts *Options) WithContext(ctx context.Context) *Options {
+	opts.ctx = ctx
 	return opts
 }
 
 // Clears all from the current options.
 func (opts *Options) ClearArgs() *Options {
 	opts.Args = []string{}
+	opts.ArgsOriginal = []string{}
+	return opts
+}
+
+// Restores args to its original value
+func (opts *Options) RestorArgs() *Options {
+	opts.Args = opts.ArgsOriginal[:]
 	return opts
 }
 
@@ -440,7 +467,7 @@ func (opts *Options) Prompt(options PromptOptions) (any, error) {
 	once := options.toOnce()
 	status := PromptStatus{}
 	prompt := options.Prompt
-	lastError := NoPrompt
+	lastError := ErrNoPrompt
 
 	for i := 0; i <= options.Tries; i++ {
 		status.PromptCount = i
@@ -486,7 +513,7 @@ func (opts *Options) Prompt(options PromptOptions) (any, error) {
 			}
 			if !regex.MatchString(input) {
 				status.InvalidFormat++
-				lastError = RegexFailed
+				lastError = ErrRegexFailed
 				continue
 			}
 		}
@@ -544,7 +571,7 @@ func (opts *Options) Prompt(options PromptOptions) (any, error) {
 			}
 			if verifyInput != input {
 				status.InvalidVerify++
-				lastError = VerifyFailed
+				lastError = ErrVerifyFailed
 				continue
 			}
 		}

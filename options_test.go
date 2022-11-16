@@ -88,7 +88,7 @@ func TestPrompt(t *testing.T) {
 				"Name > Hi",
 				"Name > Ho",
 			},
-			expectedError: VerifyFailed,
+			expectedError: ErrVerifyFailed,
 		},
 		{
 			name: "verify retry",

@@ -72,7 +72,7 @@ func TestSimple(t *testing.T) {
 		opts.PromptOnce = func(prompt string, options PromptOnceOptions) (string, error) {
 			input := test.prompts[prompt]
 			if input == opts.QuitPrompt {
-				return input, Quit
+				return input, ErrQuit
 			}
 			return input, nil
 		}
@@ -609,6 +609,30 @@ func TestRepromptSlice(t *testing.T) {
 		} else if !equalsJson(test.input, test.expected) {
 			t.Errorf("Test [%s] failed, expected %+v got %+v", test.name, toJson(test.expected), toJson(test.input))
 		}
+	}
+}
+
+func TestSubCommand(t *testing.T) {
+	root := CreateRegistry([]RegistryEntry{{
+		Name: "sub",
+		Sub: CreateRegistry([]RegistryEntry{
+			{Name: "simple", Command: SimpleCommand{}},
+		}),
+	}})
+
+	opts := NewOptions()
+	opts.ArgPrefix = "-"
+	opts.Args = []string{"sub", "simple", "-message", "Hi!"}
+
+	err := root.Execute(opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	result := opts.Values["result"]
+
+	if !equalsJson(result, "Hi!") {
+		t.Fatal("Wrong result with sub commands.")
 	}
 }
 

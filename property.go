@@ -311,7 +311,7 @@ func (prop *Property) fromArgsSlice(opts *Options) error {
 			opts.PromptContext.forSlice(i)
 
 			loaded, err := captureValue(opts, *prop, slice.Index(i), elementPrefix)
-			keep := err != Discard
+			keep := err != ErrDiscard
 			if err != nil && keep {
 				return err
 			}
@@ -352,7 +352,7 @@ func (prop *Property) fromArgsSlice(opts *Options) error {
 		opts.PromptContext.forSlice(length)
 
 		element, loaded, err := captureType(opts, *prop, elementType, elementPrefix)
-		keep := err != Discard
+		keep := err != ErrDiscard
 		if err != nil && keep {
 			return err
 		}
@@ -488,7 +488,7 @@ func (prop *Property) fromArgsMap(opts *Options) error {
 			opts.PromptContext.forMapValue(mapKey.Interface())
 
 			valueLoaded, err := captureValue(opts, *prop, mapValue, "")
-			valueKeep := err != Discard
+			valueKeep := err != ErrDiscard
 			if err != nil && valueKeep {
 				return err
 			}
@@ -530,7 +530,7 @@ func (prop *Property) fromArgsMap(opts *Options) error {
 		opts.PromptContext.forMapKey()
 
 		key, keyLoaded, err := captureType(opts, *prop, keyType, keyPrefix)
-		keyKeep := err != Discard
+		keyKeep := err != ErrDiscard
 		if err != nil && keyKeep {
 			return err
 		}
@@ -548,7 +548,7 @@ func (prop *Property) fromArgsMap(opts *Options) error {
 			opts.PromptContext.forMapValue(key.Interface())
 
 			value, valueLoaded, err := captureType(opts, *prop, valueType, valuePrefix)
-			valueKeep := err != Discard
+			valueKeep := err != ErrDiscard
 			if err != nil && valueKeep {
 				return err
 			}

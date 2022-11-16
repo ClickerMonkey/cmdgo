@@ -5,7 +5,7 @@ import (
 	"encoding/xml"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"strconv"
 	"strings"
 
@@ -13,7 +13,7 @@ import (
 )
 
 // An error returned when no command to capture/execute is given in the arguments.
-var NoCommand = errors.New("No command given, try running with --help.")
+var ErrNoCommand = errors.New("no command given, try running with --help")
 
 // A map of "commands" by name.
 type Registry struct {
@@ -21,11 +21,21 @@ type Registry struct {
 	entryMap map[string]*RegistryEntry
 }
 
+// Creates a new empty registry.
 func NewRegistry() Registry {
 	return Registry{
 		entries:  make([]*RegistryEntry, 0),
 		entryMap: make(map[string]*RegistryEntry),
 	}
+}
+
+// Creates a registry with the given initial entries.
+func CreateRegistry(entries []RegistryEntry) Registry {
+	r := NewRegistry()
+	for _, entry := range entries {
+		r.Add(entry)
+	}
+	return r
 }
 
 // An entry for a registered command.
@@ -38,8 +48,15 @@ type RegistryEntry struct {
 	HelpShort string
 	// A long description of the command.
 	HelpLong string
-	// An instance of the command.
+	// An instance of the command. Either this or Registry should be given.
 	Command any
+	// A registry of sub commands. Either this or Command should be given.
+	Sub Registry
+}
+
+// Returns whether the registry is empty.
+func (r Registry) IsEmpty() bool {
+	return len(r.entries) == 0
 }
 
 // Adds a command to the registry.
@@ -56,6 +73,22 @@ func (r *Registry) Add(entry RegistryEntry) {
 // Returns all commands registered to this registry.
 func (r Registry) Entries() []*RegistryEntry {
 	return r.entries
+}
+
+// Returns all commands registered to this registry and all sub registries.
+func (r Registry) EntriesAll() []RegistryEntry {
+	all := make([]RegistryEntry, 0, len(r.entries))
+	for _, entry := range r.entries {
+		all = append(all, *entry)
+		if !entry.Sub.IsEmpty() {
+			sub := entry.Sub.EntriesAll()
+			for _, subEntry := range sub {
+				subEntry.Name = entry.Name + " " + subEntry.Name
+				all = append(all, subEntry)
+			}
+		}
+	}
+	return all
 }
 
 // Returns all commands that match the partial name.
@@ -94,6 +127,21 @@ func (r Registry) EntryFor(namePartial string) *RegistryEntry {
 	return nil
 }
 
+// Returns the entry & depth which matches the names if only one entry does - going deep into the entry inner registries until we reach max depth.
+func (r Registry) EntryForDeep(namePartials []string) (*RegistryEntry, int) {
+	i := 0
+	entry := r.EntryFor(namePartials[i])
+	for entry != nil {
+		if !entry.Sub.IsEmpty() {
+			i++
+			entry = entry.Sub.EntryFor(namePartials[i])
+		} else {
+			return entry, i
+		}
+	}
+	return nil, i
+}
+
 // Gets an instance of a command with the given name, or nil if non could be found.
 func (r Registry) Get(namePartial string) any {
 	entry := r.EntryFor(namePartial)
@@ -103,29 +151,50 @@ func (r Registry) Get(namePartial string) any {
 	return cloneDefault(entry.Command)
 }
 
+// Gets an instance of a command with the given name, or nil if non could be found.
+func (r Registry) GetDeep(namePartials []string) (any, int) {
+	entry, depth := r.EntryForDeep(namePartials)
+	if entry == nil {
+		return nil, depth
+	}
+	return cloneDefault(entry.Command), depth
+}
+
 // Returns whether the registry has a command with the given name.
 func (r Registry) Has(namePartial string) bool {
 	return r.EntryFor(namePartial) != nil
 }
 
+// Returns whether the registry has a command with the given name.
+func (r Registry) HasDeep(namePartials []string) bool {
+	e, _ := r.EntryForDeep(namePartials)
+	return e != nil
+}
+
 // Executes an executable command based on the given options.
 func (r Registry) Execute(opts *Options) error {
+	_, err := r.ExecuteReturn(opts)
+	return err
+}
+
+// Executes an executable command based on the given options and returns it.
+func (r Registry) ExecuteReturn(opts *Options) (any, error) {
 	cmd, err := r.Capture(opts)
 	if err != nil {
-		return err
+		return cmd, err
 	}
 
 	if executable, ok := cmd.(Executable); ok {
-		return executable.Execute(opts)
+		return cmd, executable.Execute(opts)
 	}
 
-	return nil
+	return cmd, nil
 }
 
 // Returns an instance of the command that would be captured based on the given options.
 // nil is returned if the options is missing a valid command or is requesting for help.
 func (r Registry) Peek(opts *Options) any {
-	name := ""
+	names := []string{""}
 	args := opts.Args[:]
 	argsLength := len(args)
 
@@ -135,14 +204,14 @@ func (r Registry) Peek(opts *Options) any {
 	}
 
 	if len(args) == 0 {
-		if !r.Has(name) {
+		if !r.Has(names[0]) {
 			return nil
 		}
 	} else {
-		name = args[0]
+		names = args
 	}
 
-	command := r.Get(name)
+	command, _ := r.GetDeep(names)
 
 	return command
 }
@@ -156,7 +225,7 @@ type CaptureImporter func(data []byte, target any) error
 // Interactive (prompt) can be disabled entirely with "--interactive false".
 // Importers are also evaluted, like --json, --xml, and --yaml. The value following is the path to the file to import.
 func (r Registry) Capture(opts *Options) (any, error) {
-	name := ""
+	names := []string{""}
 
 	argsLength := len(opts.Args)
 	help := GetArg("help", "", &opts.Args, opts.ArgPrefix, false)
@@ -165,21 +234,21 @@ func (r Registry) Capture(opts *Options) (any, error) {
 	}
 
 	if len(opts.Args) == 0 {
-		if !r.Has(name) {
-			return nil, NoCommand
+		if !r.Has(names[0]) {
+			return nil, ErrNoCommand
 		}
 	} else {
-		name = opts.Args[0]
+		names = opts.Args
 	}
 
-	command := r.Get(name)
+	command, depth := r.GetDeep(names)
 
 	if command == nil {
-		return nil, fmt.Errorf("Command not found: %v", name)
+		return nil, fmt.Errorf("command not found: %v", names[depth])
 	}
 
-	if name != "" {
-		opts.Args = opts.Args[1:]
+	if names[0] != "" {
+		opts.Args = opts.Args[depth+1:]
 	}
 
 	interactiveDefault := "false"
@@ -192,7 +261,7 @@ func (r Registry) Capture(opts *Options) (any, error) {
 	for arg, importer := range CaptureImports {
 		path := GetArg(arg, "", &opts.Args, opts.ArgPrefix, false)
 		if path != "" {
-			imported, err := ioutil.ReadFile(path)
+			imported, err := os.ReadFile(path)
 			if err != nil {
 				return nil, err
 			}

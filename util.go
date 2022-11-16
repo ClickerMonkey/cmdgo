@@ -72,7 +72,7 @@ func CaptureExitSignal(f func()) {
 }
 
 // An error returned when we failed setting a value from a given string.
-var InvalidFormat = errors.New("Invalid format.")
+var ErrInvalidFormat = errors.New("invalid format")
 
 // Sets the value based on the given string or returns an error if it couldn't be parsed or set.
 func SetString(value reflect.Value, s string) error {
@@ -112,7 +112,7 @@ func SetString(value reflect.Value, s string) error {
 		case reflect.Slice, reflect.Array, reflect.Pointer:
 			value.Set(reflect.ValueOf(parsed))
 		default:
-			return InvalidFormat
+			return ErrInvalidFormat
 		}
 	}
 
@@ -120,7 +120,7 @@ func SetString(value reflect.Value, s string) error {
 }
 
 // An error returned when a type cannot be parsed from a string value.
-var UnsupportedType = errors.New("Unsupported type.")
+var ErrUnsupportedType = errors.New("unsupported type")
 
 // Returns a value of the given type which is parsed from s, or returns an error.
 func ParseType(t reflect.Type, s string) (any, error) {
@@ -192,7 +192,7 @@ func ParseType(t reflect.Type, s string) (any, error) {
 		return slice.Interface(), nil
 	}
 
-	return nil, UnsupportedType
+	return nil, ErrUnsupportedType
 }
 
 // Converts the value to a non-pointer type.

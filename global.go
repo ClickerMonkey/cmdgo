@@ -21,3 +21,8 @@ func Execute(opts *Options) error {
 func Capture(opts *Options) (any, error) {
 	return GlobalRegistry.Capture(opts)
 }
+
+// Peeks a command from the options and global registry and returns it. See Registry.Peek.
+func Peek(opts *Options) any {
+	return GlobalRegistry.Peek(opts)
+}
