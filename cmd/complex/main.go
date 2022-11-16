@@ -7,6 +7,11 @@ import (
 	"github.com/ClickerMonkey/cmdgo"
 )
 
+type ProfileImage struct {
+	Url string
+	Alt string
+}
+
 type Profile struct {
 	Name        string `prompt:"Your name" min:"2"`
 	Age         *int   `prompt:"Your age"`
@@ -16,6 +21,7 @@ type Profile struct {
 		Title  string
 		Rating float32 `prompt:"Rating (0-10)" min:"0" max:"10"`
 	} `prompt-options:"start:Do you have any favorite movies?,end:,more:More?" arg:"movies"`
+	Image ProfileImage
 }
 
 func (prof *Profile) Execute(opts *cmdgo.Options) error {

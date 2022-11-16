@@ -95,7 +95,7 @@ func displayRootHelp(opts *Options, registry Registry) {
 func displayEntryHelp(opts *Options, entry *RegistryEntry) error {
 	opts.Printf("%s", entry.Name)
 
-	if entry.Aliases != nil && len(entry.Aliases) > 0 {
+	if len(entry.Aliases) > 0 {
 		aliases := make([]string, 0)
 
 		for _, alias := range entry.Aliases {
@@ -141,8 +141,10 @@ func displayEntryHelp(opts *Options, entry *RegistryEntry) error {
 
 		for _, prop := range inst.PropertyList {
 			innerKind := reflect.String
-			if prop.IsSlice() || prop.IsArray() || prop.IsStruct() || prop.IsMap() {
+			if prop.IsSlice() || prop.IsArray() || prop.IsMap() {
 				innerKind = concreteType(prop.Type.Elem()).Kind()
+			} else if prop.IsStruct() {
+				innerKind = concreteType(prop.Type).Kind()
 			}
 
 			arg := argPrefix + strings.ToLower(prop.Arg)
@@ -178,14 +180,26 @@ func displayEntryHelp(opts *Options, entry *RegistryEntry) error {
 			}
 
 			switch {
-			case argTemplate.IsArray, argTemplate.IsSlice, argTemplate.IsStruct:
-				return displayTypeHelp(prop.ConcreteType().Elem(), arg, depth+1)
+			case prop.IsArray(), prop.IsSlice():
+				err := displayTypeHelp(prop.ConcreteType().Elem(), arg, depth+1)
+				if err != nil {
+					return err
+				}
+			case prop.IsStruct():
+				err := displayTypeHelp(prop.ConcreteType(), arg, depth+1)
+				if err != nil {
+					return err
+				}
 			}
 		}
 		return nil
 	}
 
-	err := displayTypeHelp(reflect.TypeOf(entry.Command), opts.ArgPrefix, 0)
+	var err error
+
+	if entry.Command != nil {
+		err = displayTypeHelp(reflect.TypeOf(entry.Command), opts.ArgPrefix, 0)
+	}
 
 	return err
 }
