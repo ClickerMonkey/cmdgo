@@ -30,7 +30,7 @@ type Property struct {
 	PromptEnd string
 	// The text to display when questioning for more. ex: `prompt-options:"more:More?"`
 	PromptMore string
-	// If we should prompt only when the current value is an empty value (not loaded by env, flags, or prompt). ex: `prompt-options:"default"`
+	// If we should prompt only when the current value is an empty value (not loaded by env, flags, or prompt). ex: `prompt-options:"empty"`
 	PromptEmpty bool
 	// If the user input should be hidden for this property. ex: `prompt-options:"hidden"`
 	InputHidden bool
@@ -711,7 +711,7 @@ func (tpl *promptTemplate) updateStatus(status PromptStatus) {
 
 func (prop Property) getPromptTemplate(promptContext PromptContext, tpl *template.Template) promptTemplate {
 	currentValue := prop.Value.Interface()
-	isDefault := isDefaultValue(currentValue)
+	isDefault := isDefaultValue(currentValue) && !prop.Flags.Is(MatchAny(PropertyFlagDefault))
 	currentText := fmt.Sprintf("%+v", currentValue)
 
 	return promptTemplate{

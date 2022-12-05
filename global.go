@@ -3,7 +3,7 @@ package cmdgo
 var GlobalRegistry = NewRegistry()
 
 // Adds a command to the global registry.
-func Register(entry RegistryEntry) {
+func Register(entry Entry) {
 	GlobalRegistry.Add(entry)
 }
 

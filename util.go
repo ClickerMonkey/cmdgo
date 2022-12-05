@@ -227,11 +227,6 @@ func setConcrete(value reflect.Value, concrete reflect.Value) {
 	}
 }
 
-// Returns the default value for the given type.
-func defaultValue(t reflect.Type) reflect.Value {
-	return reflect.New(t).Elem()
-}
-
 // Returns a default value of the same type as the given value.
 func cloneDefault(value any) any {
 	return reflect.New(reflect.ValueOf(value).Type()).Interface()
@@ -268,9 +263,7 @@ func initializeType(typ reflect.Type) reflect.Value {
 
 // Determines if the given value matches the default value for the type. For comparing values converting to strings and comparing the strings is done.
 func isDefaultValue(value any) bool {
-	defaultValue := defaultValue(reflect.TypeOf(value)).Interface()
-
-	return toString(defaultValue) == toString(value)
+	return reflect.ValueOf(value).IsZero()
 }
 
 // Converts the given value to a string representation.

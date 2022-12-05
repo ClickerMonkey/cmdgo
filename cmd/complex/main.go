@@ -32,7 +32,7 @@ func (prof *Profile) Execute(opts *cmdgo.Options) error {
 }
 
 func main() {
-	cmdgo.Register(cmdgo.RegistryEntry{
+	cmdgo.Register(cmdgo.Entry{
 		Name:      "profile",
 		Aliases:   []string{""},
 		HelpShort: "Gets info about you",

@@ -17,20 +17,20 @@ var ErrNoCommand = errors.New("no command given, try running with --help")
 
 // A map of "commands" by name.
 type Registry struct {
-	entries  []*RegistryEntry
-	entryMap map[string]*RegistryEntry
+	entries  []*Entry
+	entryMap map[string]*Entry
 }
 
 // Creates a new empty registry.
 func NewRegistry() Registry {
 	return Registry{
-		entries:  make([]*RegistryEntry, 0),
-		entryMap: make(map[string]*RegistryEntry),
+		entries:  make([]*Entry, 0),
+		entryMap: make(map[string]*Entry),
 	}
 }
 
 // Creates a registry with the given initial entries.
-func CreateRegistry(entries []RegistryEntry) Registry {
+func CreateRegistry(entries []Entry) Registry {
 	r := NewRegistry()
 	for _, entry := range entries {
 		r.Add(entry)
@@ -39,7 +39,7 @@ func CreateRegistry(entries []RegistryEntry) Registry {
 }
 
 // An entry for a registered command.
-type RegistryEntry struct {
+type Entry struct {
 	// The user friendly name of the command.
 	Name string
 	// Aliases of the command.
@@ -60,7 +60,7 @@ func (r Registry) IsEmpty() bool {
 }
 
 // Adds a command to the registry.
-func (r *Registry) Add(entry RegistryEntry) {
+func (r *Registry) Add(entry Entry) {
 	r.entries = append(r.entries, &entry)
 	r.entryMap[Normalize(entry.Name)] = &entry
 	if entry.Aliases != nil {
@@ -71,13 +71,13 @@ func (r *Registry) Add(entry RegistryEntry) {
 }
 
 // Returns all commands registered to this registry.
-func (r Registry) Entries() []*RegistryEntry {
+func (r Registry) Entries() []*Entry {
 	return r.entries
 }
 
 // Returns all commands registered to this registry and all sub registries.
-func (r Registry) EntriesAll() []RegistryEntry {
-	all := make([]RegistryEntry, 0, len(r.entries))
+func (r Registry) EntriesAll() []Entry {
+	all := make([]Entry, 0, len(r.entries))
 	for _, entry := range r.entries {
 		all = append(all, *entry)
 		if !entry.Sub.IsEmpty() {
@@ -92,25 +92,25 @@ func (r Registry) EntriesAll() []RegistryEntry {
 }
 
 // Returns all commands that match the partial name.
-func (r Registry) Matches(namePartial string) []*RegistryEntry {
+func (r Registry) Matches(namePartial string) []*Entry {
 	name := Normalize(namePartial)
 
 	if entry, ok := r.entryMap[name]; ok {
-		return []*RegistryEntry{entry}
+		return []*Entry{entry}
 	}
 
 	if name == "" {
-		return []*RegistryEntry{}
+		return []*Entry{}
 	}
 
-	matchMap := make(map[string]*RegistryEntry)
+	matchMap := make(map[string]*Entry)
 	for key, entry := range r.entryMap {
 		if strings.HasPrefix(key, name) {
 			matchMap[entry.Name] = entry
 		}
 	}
 
-	matches := make([]*RegistryEntry, 0, len(matchMap))
+	matches := make([]*Entry, 0, len(matchMap))
 	for _, entry := range matchMap {
 		matches = append(matches, entry)
 	}
@@ -119,7 +119,7 @@ func (r Registry) Matches(namePartial string) []*RegistryEntry {
 }
 
 // Returns the entry which matches the name only if one entry does.
-func (r Registry) EntryFor(namePartial string) *RegistryEntry {
+func (r Registry) EntryFor(namePartial string) *Entry {
 	matches := r.Matches(namePartial)
 	if len(matches) == 1 {
 		return matches[0]
@@ -128,7 +128,7 @@ func (r Registry) EntryFor(namePartial string) *RegistryEntry {
 }
 
 // Returns the entry & depth which matches the names if only one entry does - going deep into the entry inner registries until we reach max depth.
-func (r Registry) EntryForDeep(namePartials []string) (*RegistryEntry, int) {
+func (r Registry) EntryForDeep(namePartials []string) (*Entry, int) {
 	i := 0
 	entry := r.EntryFor(namePartials[i])
 	for entry != nil {

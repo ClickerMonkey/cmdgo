@@ -92,7 +92,7 @@ func displayRootHelp(opts *Options, registry Registry) {
 	}
 }
 
-func displayEntryHelp(opts *Options, entry *RegistryEntry) error {
+func displayEntryHelp(opts *Options, entry *Entry) error {
 	opts.Printf("%s", entry.Name)
 
 	if len(entry.Aliases) > 0 {
