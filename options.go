@@ -435,6 +435,10 @@ type PromptOptions struct {
 	Prop *Property
 	// The valid inputs and automatic translations. The matching and translation is done before converting it to the desired type.
 	Choices PromptChoices
+	// A custom validation function for the text, before its parsed.
+	ValidateText func(text string) error
+	// A custom validation function for the text, before its parsed.
+	Validate func(value any, text string) error
 }
 
 // Generates the once options from PromptOptions
@@ -518,6 +522,15 @@ func (opts *Options) Prompt(options PromptOptions) (any, error) {
 			}
 		}
 
+		if options.ValidateText != nil {
+			err := options.ValidateText(input)
+			if err != nil {
+				status.InvalidFormat++
+				lastError = err
+				continue
+			}
+		}
+
 		parsed := input
 		if options.Choices != nil && options.Choices.HasChoices() {
 			parsed, err = options.Choices.Convert(input)
@@ -549,6 +562,15 @@ func (opts *Options) Prompt(options PromptOptions) (any, error) {
 			}
 		} else {
 			err = SetString(instance, parsed)
+			if err != nil {
+				status.InvalidFormat++
+				lastError = err
+				continue
+			}
+		}
+
+		if options.Validate != nil {
+			err := options.Validate(instance.Interface(), parsed)
 			if err != nil {
 				status.InvalidFormat++
 				lastError = err
