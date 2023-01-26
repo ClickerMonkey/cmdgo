@@ -287,3 +287,8 @@ func reflectValue(value any) reflect.Value {
 	}
 	return reflect.ValueOf(value)
 }
+
+// Returns the type of the generic paramter.
+func typeOf[V any]() reflect.Type {
+	return reflect.TypeOf((*V)(nil)).Elem()
+}

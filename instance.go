@@ -148,8 +148,24 @@ func addProperties(structValue reflect.Value, instance *Instance) {
 		}
 
 		field := structType.Field(i)
+		recurse := field.Anonymous
 
-		if field.Anonymous {
+		if recurse {
+			fieldValuePtr := fieldValue
+			if fieldValuePtr.CanAddr() {
+				fieldValuePtr = fieldValuePtr.Addr()
+			}
+			if fieldValuePtr.Type().AssignableTo(typeOf[PromptCustom]()) {
+				recurse = false
+				fieldValue = fieldValuePtr
+			}
+			if fieldValuePtr.Type().AssignableTo(typeOf[ArgValue]()) {
+				recurse = false
+				fieldValue = fieldValuePtr
+			}
+		}
+
+		if recurse {
 			addProperties(fieldValue, instance)
 		} else {
 			property := getStructProperty(field, fieldValue)

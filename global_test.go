@@ -636,6 +636,60 @@ func TestSubCommand(t *testing.T) {
 	}
 }
 
+type HasAnonymous struct {
+	PromptValueSimple
+	PromptValueStruct
+}
+
+func TestAnonymousProperty(t *testing.T) {
+	tests := []struct {
+		name     string
+		expected HasAnonymous
+		prompts  []string
+	}{
+		{
+			name: "empty",
+			expected: HasAnonymous{
+				PromptValueSimple: "aa",
+				PromptValueStruct: PromptValueStruct{
+					Name: "Phil",
+					Age:  33,
+				},
+			},
+			prompts: []string{
+				"PromptValueSimple: a",
+				"PromptValueStruct: Phil:33",
+			},
+		},
+	}
+
+	for _, test := range tests {
+		opts := NewOptions()
+		opts.ForcePrompt = true
+		opts.PromptOnce = func(prompt string, options PromptOnceOptions) (string, error) {
+			if len(test.prompts) == 0 {
+				return "", fmt.Errorf("No input left for prompt '%s'", prompt)
+			}
+			line := test.prompts[0]
+			test.prompts = test.prompts[1:]
+			if strings.HasPrefix(line, prompt) {
+				return line[len(prompt):], nil
+			} else {
+				return "", fmt.Errorf("Prompted '%s', got '%s'", prompt, line)
+			}
+		}
+
+		actual := HasAnonymous{}
+		err := Unmarshal(opts, &actual)
+
+		if err != nil {
+			t.Errorf("Test [%s] failed with error %v", test.name, err)
+		} else if !equalsJson(actual, test.expected) {
+			t.Errorf("Test [%s] failed, expected %+v got %+v", test.name, toJson(test.expected), toJson(actual))
+		}
+	}
+}
+
 func equalsJson(a any, b any) bool {
 	return toJson(a) == toJson(b)
 }
