@@ -181,6 +181,9 @@ func (prop *Property) fromArgsSimple(opts *Options) error {
 }
 
 func (prop Property) promptStart(opts *Options) (bool, error) {
+	if prop.HidePrompt {
+		return true, nil
+	}
 	if prop.PromptStart == "-" {
 		return true, nil
 	}
@@ -192,6 +195,9 @@ func (prop Property) promptStart(opts *Options) (bool, error) {
 }
 
 func (prop Property) promptEnd(opts *Options) error {
+	if prop.HidePrompt {
+		return nil
+	}
 	if prop.PromptEnd == "" {
 		return nil
 	}
@@ -296,7 +302,7 @@ func (prop *Property) fromArgsSlice(opts *Options) error {
 
 	elementTemplate := prop.getArgTemplate(argPrefix, concreteType(elementType).Kind(), opts.ArgSliceTemplate)
 
-	additionalValues := true
+	additionalValues := !prop.HidePrompt
 
 	if (opts.RepromptSliceElements || prop.Reprompt) && opts.CanPrompt() {
 		opts.PromptContext.Reprompt = true
@@ -475,7 +481,7 @@ func (prop *Property) fromArgsMap(opts *Options) error {
 	keyTemplate := prop.getArgTemplate(argPrefix, concreteType(keyType).Kind(), opts.ArgMapKeyTemplate)
 	valueTemplate := prop.getArgTemplate(argPrefix, concreteType(valueType).Kind(), opts.ArgMapValueTemplate)
 
-	additionalValues := true
+	additionalValues := !prop.HidePrompt
 
 	if (opts.RepromptMapValues || prop.Reprompt) && opts.CanPrompt() {
 		opts.PromptContext.Reprompt = true
