@@ -970,6 +970,10 @@ func (prop Property) ConcreteType() reflect.Type {
 	return concreteType(prop.Type)
 }
 
+func (prop Property) HasCustomPromptText() bool {
+	return prop.PromptText != prop.Name
+}
+
 func getStructProperty(field reflect.StructField, value reflect.Value) Property {
 	prop := Property{
 		Value: value,
