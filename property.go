@@ -971,7 +971,7 @@ func (prop Property) ConcreteType() reflect.Type {
 }
 
 func (prop Property) HasCustomPromptText() bool {
-	return prop.PromptText != prop.Name
+	return prop.PromptText != prop.Name && prop.PromptText != "-"
 }
 
 func getStructProperty(field reflect.StructField, value reflect.Value) Property {
