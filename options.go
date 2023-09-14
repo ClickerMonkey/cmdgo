@@ -148,6 +148,8 @@ func NewOptions() *Options {
 		HelpTemplate: newTemplate(`
 			{{ if .Prop.Help }}
 				- {{ .Prop.Help }}
+			{{ else if .Prop.HasCustomPromptText }}
+				- {{ .Prop.PromptText }}
 			{{ end }}
 			{{ if .Prop.IsSimple }}
 				- A

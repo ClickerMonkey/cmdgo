@@ -63,22 +63,22 @@ func (ht helpTemplate) formatted(prefixSpaces int, wrapLength int, wrapIndent in
 	return strings.Join(linesOutput, "\n")
 }
 
-func displayHelp(opts *Options, registry Registry, help string) error {
+func DisplayHelp(opts *Options, registry Registry, help string) error {
 	if help == "" {
-		displayRootHelp(opts, registry)
+		DisplayRootHelp(opts, registry)
 	} else {
 		entry := registry.EntryFor(help)
 		if entry == nil {
 			opts.Printf("%s is not a valid command. Valid commands:\n", help)
-			displayRootHelp(opts, registry)
+			DisplayRootHelp(opts, registry)
 		} else {
-			return displayEntryHelp(opts, entry)
+			return DisplayEntryHelp(opts, entry)
 		}
 	}
 	return nil
 }
 
-func displayRootHelp(opts *Options, registry Registry) {
+func DisplayRootHelp(opts *Options, registry Registry) {
 	entries := registry.EntriesAll()
 	maxLength := 0
 	for _, entry := range entries {
@@ -92,7 +92,7 @@ func displayRootHelp(opts *Options, registry Registry) {
 	}
 }
 
-func displayEntryHelp(opts *Options, entry *Entry) error {
+func DisplayEntryHelp(opts *Options, entry *Entry) error {
 	opts.Printf("%s", entry.Name)
 
 	if len(entry.Aliases) > 0 {
@@ -129,17 +129,32 @@ func displayEntryHelp(opts *Options, entry *Entry) error {
 		Options: opts,
 	}
 
-	type HelpDisplayer func(typ reflect.Type, argPrefix string, depth int) error
+	type TypeMap = map[reflect.Type]struct{}
+	type HelpDisplayer func(typ reflect.Type, argPrefix string, depth int, avoidTypes TypeMap) error
 
 	var displayTypeHelp HelpDisplayer
 
-	displayTypeHelp = func(typ reflect.Type, argPrefix string, depth int) error {
+	displayTypeHelp = func(typ reflect.Type, argPrefix string, depth int, avoidTypes TypeMap) error {
 		var err error
+
+		if _, exists := avoidTypes[typ]; exists {
+			return nil
+		}
 
 		value := reflect.New(typ)
 		inst := GetInstance(value)
 
+		avoidMore := TypeMap{}
+		for k, v := range avoidTypes {
+			avoidMore[k] = v
+		}
+		avoidMore[typ] = struct{}{}
+
 		for _, prop := range inst.PropertyList {
+			if prop.Help == "-" || (prop.HidePrompt && prop.Arg == "") {
+				continue
+			}
+
 			innerKind := reflect.String
 			if prop.IsSlice() || prop.IsArray() || prop.IsMap() {
 				innerKind = concreteType(prop.Type.Elem()).Kind()
@@ -181,12 +196,12 @@ func displayEntryHelp(opts *Options, entry *Entry) error {
 
 			switch {
 			case prop.IsArray(), prop.IsSlice():
-				err := displayTypeHelp(prop.ConcreteType().Elem(), arg, depth+1)
+				err := displayTypeHelp(prop.ConcreteType().Elem(), arg, depth+1, avoidMore)
 				if err != nil {
 					return err
 				}
 			case prop.IsStruct():
-				err := displayTypeHelp(prop.ConcreteType(), arg, depth+1)
+				err := displayTypeHelp(prop.ConcreteType(), arg, depth+1, avoidMore)
 				if err != nil {
 					return err
 				}
@@ -198,7 +213,7 @@ func displayEntryHelp(opts *Options, entry *Entry) error {
 	var err error
 
 	if entry.Command != nil {
-		err = displayTypeHelp(reflect.TypeOf(entry.Command), opts.ArgPrefix, 0)
+		err = displayTypeHelp(reflect.TypeOf(entry.Command), opts.ArgPrefix, 0, TypeMap{})
 	}
 
 	return err

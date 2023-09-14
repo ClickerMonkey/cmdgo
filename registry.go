@@ -230,7 +230,7 @@ func (r Registry) Capture(opts *Options) (any, error) {
 	argsLength := len(opts.Args)
 	help := GetArg("help", "", &opts.Args, opts.ArgPrefix, false)
 	if argsLength != len(opts.Args) {
-		return nil, displayHelp(opts, r, help)
+		return nil, DisplayHelp(opts, r, help)
 	}
 
 	if len(opts.Args) == 0 {
